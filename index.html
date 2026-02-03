@@ -1360,7 +1360,7 @@
     <!-- end top N victory popup -->
 
     <!-- Leaderboard - Hidden -->
-    <div class="history-win" id="historyWin">
+    <div class="history-win" id="historyWin" style="display: none">
       <h3>🏆 Victory History</h3>
       <div id="historyWinList"></div>
       <button
@@ -1381,10 +1381,12 @@
       function showLogin() {
         document.getElementById("loginModal").style.display = "flex";
         document.getElementById("mainContent").style.display = "none";
+        document.getElementById("historyWin").style.display = "none";
       }
       function showMain() {
         document.getElementById("loginModal").style.display = "none";
         document.getElementById("mainContent").style.display = "";
+        document.getElementById("historyWin").style.display = "";
         // Nếu là admin thì hiển thị adminPanel
         if (localStorage.getItem("lucky_racer_is_admin") === "1") {
           document.getElementById("adminPanel").style.display = "";
