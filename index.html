@@ -11,32 +11,140 @@
   </head>
   <body>
     <!-- Login Modal -->
-    <!-- <div id="loginModal" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;">
-        <div style="background:#222;padding:32px 24px 24px 24px;border-radius:12px;box-shadow:0 4px 32px #0006;min-width:320px;max-width:90vw;">
-            <h2 style="color:#fff;text-align:center;margin-bottom:18px;">Đăng nhập để vào Lucky Racer</h2>
-            <div style="display:flex;flex-direction:column;gap:12px;">
-                <input id="loginUsername" type="text" placeholder="Nhập tên đăng nhập" style="padding:10px 12px;border-radius:6px;border:1px solid #888;font-size:16px;outline:none;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <input id="loginPassword" type="password" placeholder="Nhập mật khẩu" style="padding:10px 12px;border-radius:6px;border:1px solid #888;font-size:16px;outline:none;flex:1;">
-                    <label style="color:#fff;font-size:13px;cursor:pointer;user-select:none;">
-                        <input type="checkbox" id="showLoginPassword" style="margin-right:2px;"> Hiện
-                    </label>
-                </div>
-                <label style="color:#fff;font-size:15px;display:flex;align-items:center;gap:8px;">
-                    <input type="checkbox" id="isAdmin" style="width:16px;height:16px;"> Đăng nhập với quyền admin
-                </label>
-                <button id="loginBtn" style="padding:10px 0;border-radius:6px;background:#667eea;color:#fff;font-size:16px;border:none;cursor:pointer;position:relative;">Đăng nhập
-                    <span id="loginLoadingSpinner" style="display:none;position:absolute;right:16px;top:50%;transform:translateY(-50%);">
-                        <span class="loading-spinner" style="width:22px;height:22px;border-width:3px;margin:0;"></span>
-                    </span>
-                </button>
-                <div id="loginError" style="color:#ff7675;text-align:center;display:none;font-size:14px;">Vui lòng nhập tên đăng nhập!</div>
-            </div>
+    <div
+      id="loginModal"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      "
+    >
+      <div
+        style="
+          background: #222;
+          padding: 32px 24px 24px 24px;
+          border-radius: 12px;
+          box-shadow: 0 4px 32px #0006;
+          min-width: 320px;
+          max-width: 90vw;
+        "
+      >
+        <h2 style="color: #fff; text-align: center; margin-bottom: 18px">
+          Đăng nhập để vào Lucky Racer
+        </h2>
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <input
+            id="loginUsername"
+            type="text"
+            placeholder="Nhập tên đăng nhập"
+            style="
+              padding: 10px 12px;
+              border-radius: 6px;
+              border: 1px solid #888;
+              font-size: 16px;
+              outline: none;
+            "
+          />
+          <div style="display: flex; align-items: center; gap: 8px">
+            <input
+              id="loginPassword"
+              type="password"
+              placeholder="Nhập mật khẩu"
+              style="
+                padding: 10px 12px;
+                border-radius: 6px;
+                border: 1px solid #888;
+                font-size: 16px;
+                outline: none;
+                flex: 1;
+              "
+            />
+            <label
+              style="
+                color: #fff;
+                font-size: 13px;
+                cursor: pointer;
+                user-select: none;
+              "
+            >
+              <input
+                type="checkbox"
+                id="showLoginPassword"
+                style="margin-right: 2px"
+              />
+              Hiện
+            </label>
+          </div>
+          <label
+            style="
+              color: #fff;
+              font-size: 15px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            "
+          >
+            <input
+              type="checkbox"
+              id="isAdmin"
+              style="width: 16px; height: 16px"
+            />
+            Đăng nhập với quyền admin
+          </label>
+          <button
+            id="loginBtn"
+            style="
+              padding: 10px 0;
+              border-radius: 6px;
+              background: #667eea;
+              color: #fff;
+              font-size: 16px;
+              border: none;
+              cursor: pointer;
+              position: relative;
+            "
+          >
+            Đăng nhập
+            <span
+              id="loginLoadingSpinner"
+              style="
+                display: none;
+                position: absolute;
+                right: 16px;
+                top: 50%;
+                transform: translateY(-50%);
+              "
+            >
+              <span
+                class="loading-spinner"
+                style="width: 22px; height: 22px; border-width: 3px; margin: 0"
+              ></span>
+            </span>
+          </button>
+          <div
+            id="loginError"
+            style="
+              color: #ff7675;
+              text-align: center;
+              display: none;
+              font-size: 14px;
+            "
+          >
+            Vui lòng nhập tên đăng nhập!
+          </div>
         </div>
-    </div> -->
+      </div>
+    </div>
     <!-- Remove tab navigation, keep single page -->
-    <!-- <div class="container" id="mainContent" style="display:none;"> -->
-    <div class="container" id="mainContent">
+    <div class="container" id="mainContent" style="display: none">
+      <!-- <div class="container" id="mainContent"> -->
       <!-- Chức năng admin: generate mật khẩu -->
       <div id="adminPanel" style="display: none; margin-bottom: 24px">
         <h3 style="color: #ffd700">🔑 Admin Panel</h3>
