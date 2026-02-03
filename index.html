@@ -7,10 +7,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Lucky Racer</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unicons.iconscout.com/release/v2.1.9/css/unicons.css"
+    />
+    <link rel="stylesheet" href="login-style.css" />
     <link rel="stylesheet" href="style.css?v=45" />
   </head>
   <body>
-    <!-- Login Modal -->
+    <!-- Login Modal - 3D Flip Card -->
     <div
       id="loginModal"
       style="
@@ -19,125 +28,183 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.85);
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 9999;
       "
     >
-      <div
-        style="
-          background: #222;
-          padding: 32px 24px 24px 24px;
-          border-radius: 12px;
-          box-shadow: 0 4px 32px #0006;
-          min-width: 320px;
-          max-width: 90vw;
-        "
-      >
-        <h2 style="color: #fff; text-align: center; margin-bottom: 18px">
-          Đăng nhập để vào Lucky Racer
-        </h2>
-        <div style="display: flex; flex-direction: column; gap: 12px">
-          <input
-            id="loginUsername"
-            type="text"
-            placeholder="Nhập tên đăng nhập"
-            style="
-              padding: 10px 12px;
-              border-radius: 6px;
-              border: 1px solid #888;
-              font-size: 16px;
-              outline: none;
-            "
-          />
-          <div style="display: flex; align-items: center; gap: 8px">
-            <input
-              id="loginPassword"
-              type="password"
-              placeholder="Nhập mật khẩu"
-              style="
-                padding: 10px 12px;
-                border-radius: 6px;
-                border: 1px solid #888;
-                font-size: 16px;
-                outline: none;
-                flex: 1;
-              "
-            />
-            <label
-              style="
-                color: #fff;
-                font-size: 13px;
-                cursor: pointer;
-                user-select: none;
-              "
-            >
-              <input
-                type="checkbox"
-                id="showLoginPassword"
-                style="margin-right: 2px"
-              />
-              Hiện
-            </label>
-          </div>
-          <label
-            style="
-              color: #fff;
-              font-size: 15px;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            "
-          >
-            <input
-              type="checkbox"
-              id="isAdmin"
-              style="width: 16px; height: 16px"
-            />
-            Đăng nhập với quyền admin
-          </label>
-          <button
-            id="loginBtn"
-            style="
-              padding: 10px 0;
-              border-radius: 6px;
-              background: #667eea;
-              color: #fff;
-              font-size: 16px;
-              border: none;
-              cursor: pointer;
-              position: relative;
-            "
-          >
-            Đăng nhập
-            <span
-              id="loginLoadingSpinner"
-              style="
-                display: none;
-                position: absolute;
-                right: 16px;
-                top: 50%;
-                transform: translateY(-50%);
-              "
-            >
-              <span
-                class="loading-spinner"
-                style="width: 22px; height: 22px; border-width: 3px; margin: 0"
-              ></span>
-            </span>
-          </button>
-          <div
-            id="loginError"
-            style="
-              color: #ff7675;
-              text-align: center;
-              display: none;
-              font-size: 14px;
-            "
-          >
-            Vui lòng nhập tên đăng nhập!
+      <div class="section" style="width: 100%; max-width: 500px">
+        <div class="container">
+          <div class="row full-height justify-content-center">
+            <div class="col-12 text-center align-self-center py-5">
+              <div class="section pb-5 pt-5 pt-sm-2 text-center">
+                <h6 class="mb-0 pb-3">
+                  <span>Đăng Nhập </span><span>Liên hệ VisionX</span>
+                </h6>
+                <input
+                  class="checkbox"
+                  type="checkbox"
+                  id="reg-log"
+                  name="reg-log"
+                />
+                <label for="reg-log"></label>
+                <div class="card-3d-wrap mx-auto">
+                  <div class="card-3d-wrapper">
+                    <div class="card-front">
+                      <div class="center-wrap">
+                        <div class="section text-center">
+                          <h4 class="mb-4 pb-3">Đăng nhập Lucky Racer</h4>
+                          <div class="form-group">
+                            <input
+                              type="text"
+                              id="loginUsername"
+                              class="form-style"
+                              placeholder="Tài khoản của bạn"
+                              autocomplete="off"
+                            />
+                            <i class="input-icon uil uil-at"></i>
+                          </div>
+                          <div class="form-group mt-2">
+                            <input
+                              type="password"
+                              id="loginPassword"
+                              class="form-style"
+                              placeholder="Mật khẩu của bạn"
+                              autocomplete="off"
+                            />
+                            <i class="input-icon uil uil-lock-alt"></i>
+                          </div>
+                          <div class="form-group mt-2">
+                            <label
+                              style="
+                                color: #c4c3ca;
+                                font-size: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 8px;
+                                justify-content: center;
+                              "
+                            >
+                              <input
+                                type="checkbox"
+                                id="showLoginPassword"
+                                style="width: 16px; height: 16px"
+                              />
+                              Hiện mật khẩu
+                            </label>
+                          </div>
+                          <div class="form-group mt-2">
+                            <label
+                              style="
+                                color: #ffeba7;
+                                font-size: 15px;
+                                display: flex;
+                                align-items: center;
+                                gap: 8px;
+                                justify-content: center;
+                                font-weight: 600;
+                              "
+                            >
+                              <input
+                                type="checkbox"
+                                id="isAdmin"
+                                style="width: 16px; height: 16px"
+                              />
+                              Đăng nhập Admin
+                            </label>
+                          </div>
+                          <button
+                            id="loginBtn"
+                            class="btn mt-4"
+                            style="position: relative; width: 80%"
+                          >
+                            Đăng nhập
+                            <span
+                              id="loginLoadingSpinner"
+                              style="
+                                display: none;
+                                position: absolute;
+                                right: 16px;
+                                top: 50%;
+                                transform: translateY(-50%);
+                              "
+                            >
+                              <span
+                                class="loading-spinner"
+                                style="
+                                  width: 22px;
+                                  height: 22px;
+                                  border-width: 3px;
+                                  margin: 0;
+                                "
+                              ></span>
+                            </span>
+                          </button>
+                          <div
+                            id="loginError"
+                            style="
+                              color: #ff7675;
+                              text-align: center;
+                              display: none;
+                              font-size: 14px;
+                              margin-top: 15px;
+                            "
+                          >
+                            Vui lòng nhập tên đăng nhập!
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="card-back">
+                      <div class="center-wrap">
+                        <div class="section text-center">
+                          <h4 class="mb-4 pb-3">Liên hệ VisionX</h4>
+                          <div class="form-group">
+                            <input
+                              type="text"
+                              class="form-style"
+                              placeholder="Họ và tên"
+                              autocomplete="off"
+                            />
+                            <i class="input-icon uil uil-user"></i>
+                          </div>
+                          <div class="form-group mt-2">
+                            <input
+                              type="email"
+                              class="form-style"
+                              placeholder="Email của bạn"
+                              autocomplete="off"
+                            />
+                            <i class="input-icon uil uil-at"></i>
+                          </div>
+                          <div class="form-group mt-2">
+                            <input
+                              type="text"
+                              class="form-style"
+                              placeholder="Số điện thoại"
+                              autocomplete="off"
+                            />
+                            <i class="input-icon uil uil-phone"></i>
+                          </div>
+                          <a href="#" class="btn mt-4">Gửi yêu cầu</a>
+                          <p
+                            class="mb-0 mt-3 text-center"
+                            style="font-size: 13px"
+                          >
+                            <span style="color: #c4c3ca">Hoặc liên hệ: </span>
+                            <span style="color: #ffeba7; font-weight: 600"
+                              >info@visionx.com</span
+                            >
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
