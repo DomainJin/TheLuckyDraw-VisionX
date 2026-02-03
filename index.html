@@ -1,0 +1,1606 @@
+<script>
+  const GSHEET_API = "/api/gsheet-proxy";
+</script>
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Lucky Racer</title>
+    <link rel="stylesheet" href="style.css?v=45" />
+  </head>
+  <body>
+    <!-- Login Modal -->
+    <!-- <div id="loginModal" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;">
+        <div style="background:#222;padding:32px 24px 24px 24px;border-radius:12px;box-shadow:0 4px 32px #0006;min-width:320px;max-width:90vw;">
+            <h2 style="color:#fff;text-align:center;margin-bottom:18px;">Đăng nhập để vào Lucky Racer</h2>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <input id="loginUsername" type="text" placeholder="Nhập tên đăng nhập" style="padding:10px 12px;border-radius:6px;border:1px solid #888;font-size:16px;outline:none;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input id="loginPassword" type="password" placeholder="Nhập mật khẩu" style="padding:10px 12px;border-radius:6px;border:1px solid #888;font-size:16px;outline:none;flex:1;">
+                    <label style="color:#fff;font-size:13px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="showLoginPassword" style="margin-right:2px;"> Hiện
+                    </label>
+                </div>
+                <label style="color:#fff;font-size:15px;display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="isAdmin" style="width:16px;height:16px;"> Đăng nhập với quyền admin
+                </label>
+                <button id="loginBtn" style="padding:10px 0;border-radius:6px;background:#667eea;color:#fff;font-size:16px;border:none;cursor:pointer;position:relative;">Đăng nhập
+                    <span id="loginLoadingSpinner" style="display:none;position:absolute;right:16px;top:50%;transform:translateY(-50%);">
+                        <span class="loading-spinner" style="width:22px;height:22px;border-width:3px;margin:0;"></span>
+                    </span>
+                </button>
+                <div id="loginError" style="color:#ff7675;text-align:center;display:none;font-size:14px;">Vui lòng nhập tên đăng nhập!</div>
+            </div>
+        </div>
+    </div> -->
+    <!-- Remove tab navigation, keep single page -->
+    <!-- <div class="container" id="mainContent" style="display:none;"> -->
+    <div class="container" id="mainContent">
+      <!-- Chức năng admin: generate mật khẩu -->
+      <div id="adminPanel" style="display: none; margin-bottom: 24px">
+        <h3 style="color: #ffd700">🔑 Admin Panel</h3>
+        <button
+          id="genPassBtn"
+          style="
+            padding: 8px 18px;
+            border-radius: 6px;
+            background: #e17055;
+            color: #fff;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+          "
+        >
+          Tạo mật khẩu ngẫu nhiên
+        </button>
+        <div
+          id="genPassResult"
+          style="
+            margin-top: 10px;
+            color: #00b894;
+            font-size: 18px;
+            font-weight: bold;
+          "
+        ></div>
+        <form
+          id="addAccountForm"
+          style="
+            margin-top: 18px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+          "
+        >
+          <input
+            id="newUsername"
+            type="text"
+            placeholder="Tên đăng nhập mới"
+            style="
+              padding: 6px 10px;
+              border-radius: 5px;
+              border: 1px solid #888;
+              min-width: 120px;
+            "
+          />
+          <div style="display: flex; align-items: center; gap: 8px">
+            <input
+              id="newPassword"
+              type="password"
+              placeholder="Mật khẩu mới"
+              style="
+                padding: 6px 10px;
+                border-radius: 5px;
+                border: 1px solid #888;
+                min-width: 120px;
+              "
+            />
+            <label
+              style="
+                color: #fff;
+                font-size: 13px;
+                cursor: pointer;
+                user-select: none;
+              "
+            >
+              <input
+                type="checkbox"
+                id="showNewPassword"
+                style="margin-right: 2px"
+              />
+              Hiện
+            </label>
+          </div>
+          <input
+            id="activeTime"
+            type="datetime-local"
+            style="
+              padding: 6px 10px;
+              border-radius: 5px;
+              border: 1px solid #888;
+            "
+          />
+          <input
+            id="revokeTime"
+            type="datetime-local"
+            style="
+              padding: 6px 10px;
+              border-radius: 5px;
+              border: 1px solid #888;
+            "
+          />
+          <button
+            type="submit"
+            style="
+              padding: 6px 14px;
+              border-radius: 5px;
+              background: #00b894;
+              color: #fff;
+              border: none;
+            "
+          >
+            Thêm tài khoản
+          </button>
+        </form>
+        <div
+          id="accountList"
+          style="margin-top: 16px; color: #fff; font-size: 15px"
+        ></div>
+      </div>
+      <h1>The Lucky Racer - Settings</h1>
+
+      <!-- Loading Indicator -->
+      <div class="loading-container" id="loadingContainer">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Loading icons...</div>
+        <div class="loading-progress" id="loadingProgress">0%</div>
+      </div>
+
+      <!-- Game Settings -->
+      <div class="settings-panel" id="settingsPanel">
+        <h2>Race Settings</h2>
+
+        <!-- Simplified Prize Setup (Top Priority) -->
+        <div
+          style="
+            padding: 20px;
+            margin-bottom: 20px;
+            background: rgba(255, 215, 0, 0.15);
+            border: 2px solid #ffd700;
+            border-radius: 8px;
+          "
+        >
+          <h3 style="color: #ffd700; margin: 0 0 15px 0; font-size: 18px">
+            🏆 Tạo Script Đua
+          </h3>
+          <div style="display: flex; gap: 10px; margin-bottom: 12px">
+            <input
+              type="text"
+              id="simplePrizeName"
+              placeholder="Tên giải (VD: Giải Nhất)"
+              style="
+                flex: 2;
+                padding: 12px;
+                background: #222;
+                color: white;
+                border: 1px solid #444;
+                border-radius: 5px;
+                font-size: 14px;
+              "
+            />
+            <input
+              type="number"
+              id="simplePrizeCount"
+              value="1"
+              min="1"
+              placeholder="Số người"
+              style="
+                flex: 1;
+                padding: 12px;
+                background: #222;
+                color: white;
+                border: 1px solid #444;
+                border-radius: 5px;
+                max-width: 100px;
+                font-size: 14px;
+              "
+            />
+            <button
+              class="btn"
+              onclick="if (window.game) game.addRaceScript();"
+              style="
+                background: #27ae60;
+                padding: 12px 20px;
+                margin: 0;
+                font-size: 14px;
+                white-space: nowrap;
+              "
+            >
+              + Tạo Script
+            </button>
+          </div>
+          <div
+            id="raceScriptsList"
+            style="
+              background: rgba(0, 0, 0, 0.4);
+              border-radius: 5px;
+              padding: 12px;
+              min-height: 60px;
+              color: white;
+              font-size: 13px;
+              max-height: 300px;
+              overflow-y: auto;
+              border: 1px solid #444;
+            "
+          >
+            <i style="color: #888">Chưa có script nào được tạo...</i>
+          </div>
+          <small style="color: #888; display: block; margin-top: 8px">
+            💡 Mỗi script = 1 lần đua. Nhấn START để chạy đua với giải đó
+          </small>
+        </div>
+
+        <!-- File Upload Section - Enlarged and Highlighted -->
+        <div
+          style="
+            margin: 25px 0;
+            padding: 20px;
+            background: linear-gradient(
+              135deg,
+              rgba(102, 126, 234, 0.15),
+              rgba(118, 75, 162, 0.15)
+            );
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+          "
+        >
+          <h3
+            style="
+              color: #667eea;
+              margin: 0 0 15px 0;
+              font-size: 18px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+            "
+          >
+            <span>📊 Danh sách người chơi</span>
+            <button
+              class="btn btn-small"
+              onclick="game.togglePlayerListSection()"
+              style="
+                background: #667eea;
+                padding: 5px 12px;
+                font-size: 14px;
+                margin: 0;
+              "
+            >
+              −
+            </button>
+          </h3>
+
+          <div id="playerListContainer" style="display: block">
+            <!-- Two column layout for Number of Racers and File Upload -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                align-items: start;
+              "
+            >
+              <!-- Left column: Number of Racers -->
+              <div class="input-group" style="margin: 0">
+                <label
+                  for="duckCount"
+                  style="font-size: 16px; font-weight: bold"
+                  >Number of Racers:</label
+                >
+                <input
+                  type="number"
+                  id="duckCount"
+                  min="10"
+                  max="10000"
+                  value="300"
+                  style="
+                    font-size: 18px;
+                    padding: 12px;
+                    font-weight: bold;
+                    width: 100%;
+                  "
+                />
+              </div>
+
+              <!-- Right column: Racer List File -->
+              <div class="input-group" style="margin: 0">
+                <label
+                  for="duckNamesFile"
+                  id="fileLabel"
+                  style="font-size: 16px; font-weight: bold; color: #fff"
+                >
+                  Racer List File (CSV/Excel):
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center">
+                  <input
+                    type="file"
+                    id="duckNamesFile"
+                    accept=".csv,.xlsx,.xls"
+                    onchange="game.loadDuckNames(event)"
+                    style="
+                      flex: 1;
+                      font-size: 16px;
+                      padding: 12px;
+                      cursor: pointer;
+                      border: 2px dashed #667eea;
+                      border-radius: 8px;
+                      background: rgba(0, 0, 0, 0.3);
+                    "
+                  />
+                  <button
+                    onclick="game.clearLoadedFile()"
+                    id="clearFileBtn"
+                    class="btn btn-warning"
+                    style="display: none; padding: 12px 20px; font-size: 16px"
+                  >
+                    🗑️ Clear
+                  </button>
+                </div>
+                <small
+                  style="
+                    color: #ccc;
+                    display: block;
+                    margin-top: 8px;
+                    font-size: 14px;
+                  "
+                >
+                </small>
+              </div>
+            </div>
+          </div>
+          <!-- end playerListContainer -->
+        </div>
+
+        <!-- Audio Settings Section -->
+        <div
+          style="
+            margin: 20px 0;
+            padding: 18px;
+            background: rgba(46, 213, 115, 0.1);
+            border: 1px solid #2ed573;
+            border-radius: 10px;
+          "
+        >
+          <h3
+            style="
+              color: #2ed573;
+              margin: 0 0 12px 0;
+              font-size: 17px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+            "
+          >
+            <span>🔊 Âm thanh</span>
+            <button
+              class="btn btn-small"
+              onclick="game.toggleAudioSection()"
+              style="
+                background: #2ed573;
+                padding: 5px 12px;
+                font-size: 14px;
+                margin: 0;
+              "
+            >
+              −
+            </button>
+          </h3>
+
+          <div id="audioContainer" style="display: block">
+            <!-- Two column layout for Enable Sound and Custom Race Sound -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                align-items: start;
+              "
+            >
+              <!-- Left column: Enable Sound -->
+              <div class="input-group" style="margin: 0">
+                <label
+                  for="soundToggle"
+                  style="
+                    font-size: 17px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    cursor: pointer;
+                    padding: 10px;
+                    background: rgba(0, 0, 0, 0.2);
+                    border-radius: 6px;
+                    border: 1px solid #2ed573;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="soundToggle"
+                    checked
+                    style="width: 24px; height: 24px; cursor: pointer"
+                  />
+                  <span style="font-weight: 600">Enable Sound</span>
+                </label>
+              </div>
+
+              <!-- Right column: Custom Race Sound -->
+              <div class="input-group" style="margin: 0">
+                <label
+                  for="customSoundFile"
+                  id="audioFileLabel"
+                  style="font-size: 15px; font-weight: 500"
+                  >Custom Race Sound (MP3):</label
+                >
+                <div style="display: flex; gap: 10px; align-items: center">
+                  <input
+                    type="file"
+                    id="customSoundFile"
+                    accept=".mp3,.wav,.ogg"
+                    style="
+                      flex: 1;
+                      padding: 10px;
+                      font-size: 14px;
+                      border: 1px solid #2ed573;
+                      border-radius: 6px;
+                      background: rgba(0, 0, 0, 0.2);
+                    "
+                  />
+                  <button
+                    onclick="game.clearAudioFile()"
+                    id="clearAudioBtn"
+                    class="btn btn-warning"
+                    style="display: none; padding: 10px 16px; font-size: 14px"
+                  >
+                    🗑️ Clear
+                  </button>
+                </div>
+                <small
+                  style="
+                    color: #2ed573;
+                    display: block;
+                    margin-top: 5px;
+                    font-weight: 500;
+                  "
+                >
+                  <br />
+                  <strong style="color: #ffd700"></strong>
+                </small>
+              </div>
+            </div>
+          </div>
+          <!-- end audioContainer -->
+        </div>
+
+        <!-- Display Settings Section -->
+        <div
+          style="
+            margin: 20px 0;
+            padding: 18px;
+            background: rgba(255, 159, 64, 0.1);
+            border: 1px solid #ff9f40;
+            border-radius: 10px;
+          "
+        >
+          <h3
+            style="
+              color: #ff9f40;
+              margin: 0 0 12px 0;
+              font-size: 17px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+            "
+          >
+            <span>🖥️ Cài đặt màn hình</span>
+            <button
+              class="btn btn-small"
+              onclick="game.toggleDisplaySection()"
+              style="
+                background: #ff9f40;
+                padding: 5px 12px;
+                font-size: 14px;
+                margin: 0;
+              "
+            >
+              −
+            </button>
+          </h3>
+          <div id="displayContainer" style="display: block">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <label style="font-size: 15px; color: #fff; font-weight: 500"
+                >Race Track Aspect Ratio:</label
+              >
+              <input
+                type="text"
+                id="raceTrackAspectRatio"
+                value="20:5"
+                placeholder="e.g., 16:9, 30:9, 21:9"
+                style="
+                  padding: 12px;
+                  background: rgba(0, 0, 0, 0.3);
+                  border: 1px solid #ff9f40;
+                  border-radius: 6px;
+                  color: #fff;
+                  font-size: 16px;
+                "
+                oninput="validateAspectRatioInput(this)"
+              />
+              <small style="color: #888; font-size: 13px">
+                Format: width:height (e.g., 16:9, 30:9)
+              </small>
+            </div>
+
+            <div
+              class="input-group"
+              style="margin-top: 15px; display: flex; gap: 10px"
+            >
+              <button
+                class="btn btn-small"
+                onclick="game.applyResultPanelSettings()"
+                style="
+                  background: #667eea;
+                  flex: 1;
+                  padding: 12px;
+                  font-size: 15px;
+                "
+              >
+                ✓ Apply
+              </button>
+              <button
+                class="btn btn-small"
+                onclick="game.resetResultPanelSettings()"
+                style="
+                  background: #888;
+                  flex: 1;
+                  padding: 12px;
+                  font-size: 15px;
+                "
+              >
+                ⟲ Reset
+              </button>
+            </div>
+
+            <!-- Open Display Button -->
+            <div class="input-group" style="margin-top: 20px">
+              <a
+                href="display.html"
+                target="_blank"
+                class="btn btn-secondary"
+                id="openDisplayBtn"
+                style="
+                  width: 100%;
+                  padding: 18px;
+                  font-size: 20px;
+                  font-weight: bold;
+                  margin-bottom: 10px;
+                  text-align: center;
+                  text-decoration: none;
+                  display: inline-block;
+                  pointer-events: none;
+                  opacity: 0.5;
+                  background: linear-gradient(135deg, #667eea, #764ba2);
+                  border: none;
+                  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                "
+              >
+                ⏳ Loading Icons...
+              </a>
+              <small
+                style="color: #ffd700; font-weight: bold; font-size: 15px"
+              ></small
+              ><br />
+              <small style="color: #888; font-size: 13px"></small>
+            </div>
+          </div>
+          <!-- end displayContainer -->
+        </div>
+
+        <!-- Control Panel (for control window) -->
+        <div
+          class="control-panel"
+          id="controlPanel"
+          style="
+            margin-top: 20px;
+            position: relative;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+          "
+        >
+          <!-- <button class="btn btn-small" onclick="game.goHome()" id="homeBtn">
+            🏠 Home
+          </button> -->
+          <div class="input-group">
+            <label for="raceDuration" style="font-size: 16px; font-weight: bold"
+              >Race Duration (seconds):</label
+            >
+            <input
+              type="number"
+              id="raceDuration"
+              min="5"
+              max="300"
+              value="30"
+              style="font-size: 18px; padding: 12px; font-weight: bold"
+            />
+          </div>
+          <button
+            class="btn btn-small"
+            onclick="game.controlStartRace()"
+            id="controlStartBtn"
+            disabled
+          >
+            Loading...
+          </button>
+          <button
+            class="btn btn-small"
+            onclick="game.pauseRace()"
+            id="pauseBtn"
+          >
+            ⏸ Pause
+          </button>
+          <button
+            class="btn btn-small"
+            onclick="game.resumeRace()"
+            id="resumeBtn"
+            disabled
+          >
+            ▶ Resume
+          </button>
+          <button
+            class="btn btn-primary"
+            onclick="game.continueRace()"
+            id="continueBtn"
+            style="display: none"
+          >
+            🎯 Next Race
+          </button>
+          <button
+            class="btn btn-primary"
+            onclick="game.nextRace()"
+            id="nextRaceBtn"
+            style="display: none; background: #3498db"
+          >
+            ➡️ Next Race
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="game.showWinnersPanel()"
+            id="viewResultsBtn"
+          >
+            📋 View Results
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="game.resetHistory()"
+            id="resetHistoryBtn"
+            style="background: #e74c3c"
+          >
+            🔄 Restart
+          </button>
+        </div>
+        <!-- end control panel -->
+      </div>
+      <!-- end game settings -->
+
+      <!-- Race Info (for control window) -->
+      <div
+        class="race-info"
+        id="raceInfo"
+        style="margin-top: 20px; position: relative"
+      >
+        <div class="info-item">
+          <span class="label">Race:</span>
+          <span id="raceNumber" class="value">#1</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Time Left:</span>
+          <span id="timeLeft" class="value">30s</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Status:</span>
+          <span id="raceStatus" class="value">Waiting</span>
+        </div>
+      </div>
+
+      <!-- Result Panel Settings - Collapsible -->
+      <div class="result-panel-settings">
+        <div>
+          <div style="display: flex; justify-content: center">
+            <button
+              class="btn btn-small"
+              onclick="game.toggleResultPanelSettings()"
+              style="background: #686964; width: auto"
+            >
+              ⚙️ Result Panel Settings
+            </button>
+          </div>
+
+          <div
+            id="resultPanelSettingsContainer"
+            style="
+              display: none;
+              margin-top: 15px;
+              padding: 15px;
+              background: rgba(102, 126, 234, 0.1);
+              border-radius: 8px;
+            "
+          >
+            <div
+              class="main-panel-prize-settings"
+              style="font-size: 14px; color: #fff; margin-bottom: 10px"
+            >
+              <div class="input-group">
+                <label for="prizeTitleInput">Prize Title:</label>
+                <input
+                  type="text"
+                  id="prizeTitleInput"
+                  placeholder="Prize Results"
+                  value="Prize Results"
+                  maxlength="50"
+                  style="
+                    padding: 8px;
+                    border-radius: 5px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    background: rgba(0, 0, 0, 0.3);
+                    color: white;
+                    width: 100%;
+                  "
+                />
+                <small style="color: #888"
+                  >This will appear on result panel and popup</small
+                >
+              </div>
+
+              <!-- Result Prize Assignment Settings -->
+              <div
+                class="main-panel-prize-settings"
+                style="
+                  margin-top: 15px;
+                  padding: 10px;
+                  background: rgba(102, 126, 234, 0.1);
+                  border: 1px solid #667eea;
+                  border-radius: 5px;
+                "
+              >
+                <h4 style="color: #667eea; font-size: 16px; margin: 0 0 10px 0">
+                  📊 Gán Giải thưởng cho Kết quả (Result)
+                </h4>
+
+                <!-- Prize Group Input for Result -->
+                <div
+                  style="
+                    background: rgba(0, 0, 0, 0.3);
+                    padding: 12px;
+                    border-radius: 5px;
+                    margin-bottom: 10px;
+                  "
+                >
+                  <div style="display: flex; gap: 8px; margin-bottom: 8px">
+                    <input
+                      type="text"
+                      id="prizeResultGroupName"
+                      placeholder="Tên giải (VD: Giải Khuyến Khích)"
+                      style="
+                        flex: 2;
+                        padding: 8px;
+                        background: #222;
+                        color: white;
+                        border: 1px solid #444;
+                        border-radius: 3px;
+                      "
+                    />
+                    <input
+                      type="number"
+                      id="prizeResultGroupCount"
+                      placeholder="Số người"
+                      min="1"
+                      value="1"
+                      style="
+                        flex: 1;
+                        padding: 8px;
+                        background: #222;
+                        color: white;
+                        border: 1px solid #444;
+                        border-radius: 3px;
+                        max-width: 100px;
+                      "
+                    />
+                    <button
+                      class="btn btn-small"
+                      onclick="game.addPrizeResultGroup()"
+                      style="
+                        background: #8e44ad;
+                        padding: 8px 15px;
+                        font-size: 13px;
+                        white-space: nowrap;
+                      "
+                    >
+                      + Thêm nhóm giải
+                    </button>
+                  </div>
+                  <small style="color: #888; display: block">
+                    💡 Tạo nhiều hàng gán giải cùng tên một lúc
+                  </small>
+                </div>
+
+                <div
+                  id="prizeAssignmentResultContainer"
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    max-height: 250px;
+                    overflow-y: auto;
+                  "
+                >
+                  <!-- Prize assignment fields will be dynamically added here -->
+                </div>
+                <div
+                  style="
+                    margin-top: 10px;
+                    display: flex;
+                    gap: 5px;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <button
+                    class="btn btn-small"
+                    onclick="game.loadVictoryHistoryToAssignments()"
+                    style="
+                      background: #f39c12;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    📜 Load Victory History
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.clearAllResultAssignments()"
+                    style="
+                      background: #c0392b;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    🗑️ Xóa tất cả
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.reverseAssignments()"
+                    style="
+                      background: #9b59b6;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                    title="Đảo ngược thứ tự danh sách"
+                  >
+                    🔄 Đảo thứ tự
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.showPrizeAssignments()"
+                    style="
+                      background: #27ae60;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    📋 Show Assignments
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.applyPrizeResultAssignment()"
+                    style="
+                      background: #667eea;
+                      padding: 5px 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    ✓ Apply & Show Results
+                  </button>
+                </div>
+
+                <!-- Result Assignments Display (Toggle) -->
+                <div
+                  id="resultAssignmentsDisplay"
+                  style="
+                    display: none;
+                    margin-top: 10px;
+                    padding: 10px;
+                    background: rgba(0, 0, 0, 0.4);
+                    border-radius: 5px;
+                    border: 1px solid #667eea;
+                    max-height: 200px;
+                    overflow-y: auto;
+                  "
+                >
+                  <div
+                    style="
+                      color: #667eea;
+                      font-weight: bold;
+                      margin-bottom: 5px;
+                    "
+                  >
+                    🎁 Result Assignments:
+                  </div>
+                  <div
+                    id="resultAssignmentsContent"
+                    style="color: #fff; font-size: 13px; line-height: 1.6"
+                  ></div>
+                </div>
+
+                <small style="color: #888; margin-top: 8px; display: block"
+                  >* Chọn người nhận giải từ danh sách "Victory History" đã
+                  lưu.</small
+                >
+              </div>
+            </div>
+            <!-- Result Panel Background Settings -->
+            <div
+              class="main-panel-background-settings"
+              style="font-size: 14px; color: #fff; margin: 20px 0 10px 0"
+            >
+              <div
+                style="
+                  display: flex;
+                  justify-content: center;
+                  margin-bottom: 10px;
+                "
+              >
+                <button
+                  class="btn btn-small"
+                  onclick="game.toggleBackgroundSettings()"
+                  style="background: #ff9f40; width: auto"
+                >
+                  🎨 Background Settings
+                </button>
+              </div>
+
+              <div id="backgroundSettingsContainer" style="display: none">
+                <div class="input-group">
+                  <label for="resultBgType">Background Type:</label>
+                  <select
+                    id="resultBgType"
+                    onchange="game.toggleResultBackground()"
+                  >
+                    <option value="default">Default</option>
+                    <option value="color">Solid Color</option>
+                    <option value="image">Custom Image</option>
+                  </select>
+                </div>
+
+                <div
+                  class="input-group"
+                  id="resultBgColorGroup"
+                  style="display: none"
+                >
+                  <label for="resultBgColor">Background Color:</label>
+                  <input type="color" id="resultBgColor" value="#1a1a2e" />
+                </div>
+
+                <div
+                  class="input-group"
+                  id="resultBgImageGroup"
+                  style="display: none"
+                >
+                  <label for="resultBgImage">Background Image:</label>
+                  <input
+                    type="file"
+                    id="resultBgImage"
+                    accept="image/*"
+                    onchange="game.loadResultBackgroundImage(event)"
+                  />
+                  <small style="color: #888">Upload JPG, PNG, or GIF</small>
+                </div>
+
+                <div
+                  style="
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: rgba(102, 126, 234, 0.1);
+                    border-radius: 5px;
+                  "
+                >
+                  <h4
+                    style="color: #667eea; font-size: 16px; margin: 0 0 10px 0"
+                  >
+                    📐 Layout Settings
+                  </h4>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 10px;
+                    "
+                  >
+                    <div
+                      style="display: flex; flex-direction: column; gap: 5px"
+                    >
+                      <label style="font-size: 14px; color: #fff"
+                        >Winners Grid Width:</label
+                      >
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <input
+                          type="range"
+                          id="winnersGridWidth"
+                          min="70"
+                          max="100"
+                          value="95"
+                          style="flex: 1"
+                        />
+                        <span
+                          id="winnersGridWidthValue"
+                          style="
+                            min-width: 40px;
+                            font-size: 14px;
+                            color: #667eea;
+                          "
+                          >95%</span
+                        >
+                      </div>
+                    </div>
+                    <div
+                      style="display: flex; flex-direction: column; gap: 5px"
+                    >
+                      <label style="font-size: 14px; color: #fff"
+                        >Card Gap:</label
+                      >
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <input
+                          type="range"
+                          id="cardGap"
+                          min="0.5"
+                          max="3"
+                          step="0.5"
+                          value="1.5"
+                          style="flex: 1"
+                        />
+                        <span
+                          id="cardGapValue"
+                          style="
+                            min-width: 40px;
+                            font-size: 14px;
+                            color: #667eea;
+                          "
+                          >1.5%</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  <small style="color: #888; margin-top: 8px; display: block"
+                    >Adjust race track dimensions and winner card layout</small
+                  >
+                </div>
+
+                <div class="input-group">
+                  <button
+                    class="btn btn-small"
+                    onclick="game.applyResultPanelSettings()"
+                    style="background: #667eea; margin-right: 10px"
+                  >
+                    ✓ Apply
+                  </button>
+                  <button
+                    class="btn btn-small"
+                    onclick="game.resetResultPanelSettings()"
+                    style="background: #888"
+                  >
+                    ⟲ Reset
+                  </button>
+                </div>
+              </div>
+              <!-- end backgroundSettingsContainer -->
+            </div>
+            <!-- end layout settings -->
+          </div>
+          <!-- end main panel settings container -->
+        </div>
+        <!-- end collapsible -->
+      </div>
+      <!-- end main panel settings -->
+
+      <!-- Result Panel Preview - Independent -->
+      <div class="result-panel" id="resultPanel" style="margin-top: 30px">
+        <h2 id="resultTitle">Results</h2>
+        <div id="resultMessage"></div>
+      </div>
+
+      <script>
+        // Update slider values display
+        document
+          .getElementById("winnersGridWidth")
+          .addEventListener("input", (e) => {
+            document.getElementById("winnersGridWidthValue").textContent =
+              e.target.value + "%";
+          });
+        document.getElementById("cardGap").addEventListener("input", (e) => {
+          document.getElementById("cardGapValue").textContent =
+            e.target.value + "%";
+        });
+
+        // Validate aspect ratio input format
+        function validateAspectRatioInput(input) {
+          const value = input.value.trim();
+          // Allow digits, colon, and spaces
+          const cleaned = value.replace(/[^0-9:]/g, "");
+          if (cleaned !== value) {
+            input.value = cleaned;
+          }
+
+          // Check if format is valid (e.g., "16:9", "30:9")
+          const match = cleaned.match(/^(\d+):(\d+)$/);
+          if (match) {
+            input.style.borderColor = "#667eea";
+            input.style.background = "rgba(0,0,0,0.3)";
+          } else if (cleaned.length > 0) {
+            input.style.borderColor = "#ff6b6b";
+            input.style.background = "rgba(255,107,107,0.1)";
+          } else {
+            input.style.borderColor = "#667eea";
+            input.style.background = "rgba(0,0,0,0.3)";
+          }
+        }
+      </script>
+    </div>
+    <!-- end main container -->
+
+    <!-- Toast Notification Container -->
+    <div
+      id="toastContainer"
+      style="
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+      "
+    ></div>
+    <!-- end toast notification container -->
+
+    <!-- Victory Popup (outside container for max z-index) -->
+    <div class="victory-popup" id="victoryPopup">
+      <div class="victory-overlay" onclick="game.closeVictoryPopup()"></div>
+      <div class="victory-content">
+        <div class="victory-header">
+          <h1>🎉 VICTORY! 🎉</h1>
+        </div>
+        <div class="victory-body">
+          <div class="winner-icon" id="winnerIcon"></div>
+          <h2 class="winner-name" id="winnerName">Winner Name</h2>
+          <div class="winner-stats" id="winnerStats"></div>
+        </div>
+        <div class="victory-footer" style="display: none">
+          <button class="btn btn-primary" onclick="game.continueRace()">
+            🎯 Continue (Next Race)
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="
+              game.closeVictoryPopup();
+              game.showWinnersPanel();
+            "
+          >
+            📋 View Results
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- end victory popup -->
+
+    <!-- Top N Victory Popup -->
+    <div class="victory-popup" id="topNVictoryPopup">
+      <div class="victory-overlay" onclick="game.closeTopNVictoryPopup()"></div>
+      <div class="victory-content victory-content-topn">
+        <div class="victory-header">
+          <h1>🏆 TOP <span id="topNCount">N</span> WINNERS! 🏆</h1>
+        </div>
+        <div class="victory-body victory-body-topn" id="topNWinnersGrid">
+          <!-- Winners will be populated here -->
+        </div>
+        <div class="victory-footer">
+          <button
+            class="btn btn-primary"
+            onclick="
+              game.closeTopNVictoryPopup();
+              game.resetRace();
+            "
+          >
+            ▶️ Next Race
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="
+              game.closeTopNVictoryPopup();
+              game.fullReset();
+            "
+          >
+            🔄 Play Again
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="
+              game.closeTopNVictoryPopup();
+              game.showTopNResultPanel();
+            "
+          >
+            📋 View Full Results
+          </button>
+        </div>
+        <!-- end victory footer -->
+      </div>
+      <!-- end victory content -->
+    </div>
+    <!-- end top N victory popup -->
+
+    <!-- Leaderboard - Hidden -->
+    <div class="history-win" id="historyWin">
+      <h3>🏆 Victory History</h3>
+      <div id="historyWinList"></div>
+      <button
+        class="btn btn-small"
+        onclick="game.resetHistory()"
+        style="margin-top: 10px; width: 100%"
+      >
+        🔄 Restart (Clear History)
+      </button>
+    </div>
+
+    <!-- SheetJS library for Excel file support -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <script type="module" src="game.js?v=66"></script>
+    <script type="module">
+      // Đăng nhập đơn giản: chỉ cần nhập username, lưu vào localStorage
+      function showLogin() {
+        document.getElementById("loginModal").style.display = "flex";
+        document.getElementById("mainContent").style.display = "none";
+      }
+      function showMain() {
+        document.getElementById("loginModal").style.display = "none";
+        document.getElementById("mainContent").style.display = "";
+        // Nếu là admin thì hiển thị adminPanel
+        if (localStorage.getItem("lucky_racer_is_admin") === "1") {
+          document.getElementById("adminPanel").style.display = "";
+        } else {
+          document.getElementById("adminPanel").style.display = "none";
+        }
+      }
+      function isLoggedIn() {
+        return !!localStorage.getItem("lucky_racer_user");
+      }
+      async function handleLogin() {
+        var loginBtn = document.getElementById("loginBtn");
+        var spinner = document.getElementById("loginLoadingSpinner");
+        loginBtn.disabled = true;
+        loginBtn.style.opacity = 0.7;
+        spinner.style.display = "inline-block";
+        var username = document.getElementById("loginUsername").value.trim();
+        var password = document.getElementById("loginPassword").value;
+        var isAdmin = document.getElementById("isAdmin").checked;
+        var errorDiv = document.getElementById("loginError");
+        errorDiv.style.display = "none";
+        if (!username || !password) {
+          errorDiv.textContent = "Vui lòng nhập tên đăng nhập và mật khẩu!";
+          errorDiv.style.display = "block";
+          loginBtn.disabled = false;
+          loginBtn.style.opacity = 1;
+          spinner.style.display = "none";
+          return;
+        }
+        // Lấy danh sách account từ API
+        const GSHEET_API = "/api/gsheet-proxy";
+        let accounts = [];
+        try {
+          let res = await fetch(GSHEET_API);
+          accounts = await res.json();
+        } catch (e) {
+          errorDiv.textContent = "Không thể kết nối server!";
+          errorDiv.style.display = "block";
+          loginBtn.disabled = false;
+          loginBtn.style.opacity = 1;
+          spinner.style.display = "none";
+          return;
+        }
+        var now = Date.now();
+        // Nếu là admin: chỉ cho phép đăng nhập đúng account visionx/admin123
+        if (isAdmin) {
+          let found = accounts.find(
+            (acc) => acc.username === "visionx" && acc.password === "admin123",
+          );
+          if (!found) {
+            errorDiv.textContent = "Không tìm thấy tài khoản admin!";
+            errorDiv.style.display = "block";
+            loginBtn.disabled = false;
+            loginBtn.style.opacity = 1;
+            spinner.style.display = "none";
+            return;
+          }
+          if (username !== "visionx" || password !== "admin123") {
+            errorDiv.textContent = "Sai tài khoản hoặc mật khẩu admin!";
+            errorDiv.style.display = "block";
+            loginBtn.disabled = false;
+            loginBtn.style.opacity = 1;
+            spinner.style.display = "none";
+            return;
+          }
+          localStorage.setItem("lucky_racer_user", username);
+          localStorage.setItem("lucky_racer_is_admin", "1");
+          loginBtn.disabled = false;
+          loginBtn.style.opacity = 1;
+          spinner.style.display = "none";
+          showMain();
+          return;
+        }
+        // Đăng nhập thường: kiểm tra account hợp lệ, trong thời gian hiệu lực
+        let found = accounts.find(
+          (acc) =>
+            acc.username === username &&
+            acc.password === password &&
+            now >= acc.active &&
+            now <= acc.revoke,
+        );
+        if (!found) {
+          errorDiv.textContent =
+            "Sai tài khoản, mật khẩu hoặc tài khoản đã hết hạn!";
+          errorDiv.style.display = "block";
+          loginBtn.disabled = false;
+          loginBtn.style.opacity = 1;
+          spinner.style.display = "none";
+          return;
+        }
+        localStorage.setItem("lucky_racer_user", username);
+        localStorage.removeItem("lucky_racer_is_admin");
+        loginBtn.disabled = false;
+        loginBtn.style.opacity = 1;
+        spinner.style.display = "none";
+        showMain();
+        // Khởi tạo game nếu cần
+        if (typeof game !== "undefined") {
+          game.loadSavedData && game.loadSavedData();
+          game.loadPrizeNames && game.loadPrizeNames();
+          game.renderPrizeRaceUI && game.renderPrizeRaceUI();
+          game.renderPrizeAssignmentUI && game.renderPrizeAssignmentUI();
+          game.loadResultPanelSettings && game.loadResultPanelSettings();
+        }
+      }
+      // Hàm sinh mật khẩu ngẫu nhiên
+      function generatePassword(length = 10) {
+        const chars =
+          "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
+        let pass = "";
+        for (let i = 0; i < length; i++) {
+          pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return pass;
+      }
+
+      // Hợp nhất sự kiện DOMContentLoaded để kiểm soát hiển thị giao diện và gán sự kiện
+      window.addEventListener("DOMContentLoaded", function () {
+        // Sự kiện show/hide password cho login
+        const showLoginPw = document.getElementById("showLoginPassword");
+        if (showLoginPw) {
+          showLoginPw.addEventListener("change", function () {
+            const pwInput = document.getElementById("loginPassword");
+            if (pwInput) pwInput.type = this.checked ? "text" : "password";
+          });
+        }
+        // Sự kiện show/hide password cho admin panel
+        const showNewPw = document.getElementById("showNewPassword");
+        if (showNewPw) {
+          showNewPw.addEventListener("change", function () {
+            const pwInput = document.getElementById("newPassword");
+            if (pwInput) pwInput.type = this.checked ? "text" : "password";
+          });
+        }
+        // Ẩn cả hai giao diện trước khi kiểm tra
+        document.getElementById("loginModal").style.display = "none";
+        document.getElementById("mainContent").style.display = "none";
+
+        // Luôn yêu cầu đăng nhập mỗi lần truy cập
+        localStorage.removeItem("lucky_racer_user");
+        localStorage.removeItem("lucky_racer_is_admin");
+        showLogin();
+        document.getElementById("loginBtn").onclick = handleLogin;
+        document
+          .getElementById("loginUsername")
+          .addEventListener("keydown", function (e) {
+            if (e.key === "Enter") handleLogin();
+          });
+        // Sự kiện cho nút generate mật khẩu (chỉ khi là admin)
+        const genBtn = document.getElementById("genPassBtn");
+        if (genBtn) {
+          genBtn.onclick = function () {
+            const pw = generatePassword(12);
+            document.getElementById("genPassResult").textContent = pw;
+          };
+        }
+
+        // Admin panel: quản lý tài khoản
+        async function renderAccountList() {
+          let html = "<b>Danh sách tài khoản:</b><br>";
+          let accounts = [];
+          try {
+            let res = await fetch(GSHEET_API);
+            accounts = await res.json();
+          } catch (e) {
+            html +=
+              '<span style="color:#ff7675">Không thể tải danh sách tài khoản!</span>';
+            document.getElementById("accountList").innerHTML = html;
+            return;
+          }
+          if (accounts.length === 0) {
+            html += "<i>Chưa có tài khoản nào.</i>";
+          } else {
+            html += '<ul style="padding-left:18px;">';
+            accounts.forEach(function (item, idx) {
+              var activeStr = new Date(item.active).toLocaleString();
+              var revokeStr = new Date(item.revoke).toLocaleString();
+              var expired = Date.now() > item.revoke;
+              html += `<li><span style="color:${expired ? "#ff7675" : "#00b894"}">${item.username}</span> <span style="font-size:13px;">(Hiệu lực: ${activeStr} - ${revokeStr})</span> <button onclick="removeAccount('${item.username}')" style="color:#fff;background:#e17055;border:none;border-radius:4px;padding:2px 8px;margin-left:8px;cursor:pointer;">Xóa</button></li>`;
+            });
+            html += "</ul>";
+          }
+          document.getElementById("accountList").innerHTML = html;
+        }
+        window.removeAccount = async function (username) {
+          const params = new URLSearchParams();
+          params.append("action", "delete");
+          params.append("username", username);
+          await fetch(GSHEET_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: params.toString(),
+          });
+          renderAccountList();
+        };
+        // Module gửi dữ liệu tạo tài khoản lên Google Script
+        async function createAccountOnGSheet({
+          username,
+          password,
+          activeMs,
+          revokeMs,
+        }) {
+          // Gửi trực tiếp lên Google Script Web App (bỏ qua proxy nếu cần)
+          const GSHEET_WEBAPP =
+            "https://script.google.com/macros/s/AKfycbxo289V3Ky97PwhyW5INpfefEaw_LRwb90mbmBVtUNYIIxMphJ8plKTD8P7RnUmRsRm/exec";
+          const params = new URLSearchParams();
+          params.append("username", username);
+          params.append("password", password);
+          params.append("active", activeMs);
+          params.append("revoke", revokeMs);
+          try {
+            let res = await fetch(GSHEET_WEBAPP, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: params.toString(),
+            });
+            let data = await res.json();
+            return data;
+          } catch (e) {
+            return { error: "Lỗi kết nối server!" };
+          }
+        }
+
+        var addForm = document.getElementById("addAccountForm");
+        if (addForm) {
+          addForm.onsubmit = async function (e) {
+            e.preventDefault();
+            var username = document.getElementById("newUsername").value.trim();
+            var pw = document.getElementById("newPassword").value.trim();
+            // Bắt buộc mật khẩu phải bắt đầu bằng chữ cái (không được bắt đầu bằng số)
+            if (!/^[A-Za-z]/.test(pw)) {
+              alert(
+                "Mật khẩu phải bắt đầu bằng ký tự chữ cái (không được bắt đầu bằng số)!",
+              );
+              return;
+            }
+            // Sự kiện show/hide password cho login
+            const showLoginPw = document.getElementById("showLoginPassword");
+            if (showLoginPw) {
+              showLoginPw.addEventListener("change", function () {
+                const pwInput = document.getElementById("loginPassword");
+                pwInput.type = this.checked ? "text" : "password";
+              });
+            }
+            // Sự kiện show/hide password cho admin panel
+            const showNewPw = document.getElementById("showNewPassword");
+            if (showNewPw) {
+              showNewPw.addEventListener("change", function () {
+                const pwInput = document.getElementById("newPassword");
+                pwInput.type = this.checked ? "text" : "password";
+              });
+            }
+            var active = document.getElementById("activeTime").value;
+            var revoke = document.getElementById("revokeTime").value;
+            if (!username || !pw || !active || !revoke) {
+              alert(
+                "Vui lòng nhập đủ tài khoản, mật khẩu, thời gian hiệu lực và thu hồi!",
+              );
+              return;
+            }
+            var activeMs = new Date(active).getTime();
+            var revokeMs = new Date(revoke).getTime();
+            console.log("DEBUG gửi lên:", {
+              username,
+              password: pw,
+              active,
+              revoke,
+              activeMs,
+              revokeMs,
+            });
+            if (
+              !active ||
+              !revoke ||
+              isNaN(activeMs) ||
+              isNaN(revokeMs) ||
+              activeMs >= revokeMs
+            ) {
+              alert("Thời gian không hợp lệ!");
+              return;
+            }
+            // Gọi module gửi dữ liệu
+            let data = await createAccountOnGSheet({
+              username,
+              password: pw,
+              activeMs,
+              revokeMs,
+            });
+            if (data.success) {
+              alert("Thêm tài khoản thành công!");
+            } else {
+              alert("Lỗi: " + (data.error || "Không rõ nguyên nhân"));
+            }
+            document.getElementById("newUsername").value = "";
+            document.getElementById("newPassword").value = "";
+            document.getElementById("activeTime").value = "";
+            document.getElementById("revokeTime").value = "";
+            renderAccountList();
+          };
+        }
+        // Hiển thị danh sách tài khoản khi vào admin panel
+        if (localStorage.getItem("lucky_racer_is_admin") === "1") {
+          renderAccountList();
+        }
+        // Khi chuyển sang admin, tự động render lại danh sách
+        window.showMain = (function (orig) {
+          return function () {
+            orig();
+            if (localStorage.getItem("lucky_racer_is_admin") === "1") {
+              renderAccountList();
+            }
+          };
+        })(window.showMain);
+      });
+
+      // Initialize simplified prize UI after game loads
+      setTimeout(() => {
+        if (window.game && game.renderSimplePrizeUI) {
+          game.renderSimplePrizeUI();
+        }
+        // Render race scripts to show existing scripts
+        if (window.game && game.renderRaceScripts) {
+          game.renderRaceScripts();
+        }
+      }, 500);
+    </script>
+  </body>
+</html>
