@@ -463,7 +463,7 @@ class Duck {
     this.laneChangeInterval = 2000; // 2 seconds
     this.currentFrame = 0;
     this.lastFrameTime = 0;
-    this.animationFPS = 20; // Increased from 12 to 20 FPS for smoother animation
+    this.animationFPS = 12; // Increased from 12 to 20 FPS for smoother animation
 
     // Lane management for finish line collision avoidance
     this.lane = Math.floor(Math.random() * 5); // 0-4: 5 lanes for smoother transitions
@@ -753,6 +753,7 @@ class Game {
     this.raceFinished = false;
     this.racePaused = false;
     this.animationId = null;
+    this.countdownInterval = null; // For results countdown
     this.startTime = null;
     this.pausedTime = 0;
     this.rankings = [];
@@ -923,8 +924,9 @@ class Game {
     this.winnerAnimationFrame = 0;
     this.winnerAnimationInterval = null;
 
-    this.duckImages = []; // Mỗi phần tử sẽ là array 3 ảnh [frame1, frame2, frame3]
-    this.iconCount = 44; // output_3 có 44 folders
+    this.duckImages = []; // Mỗi phần tử sẽ là array chứa các frame của 1 duck
+    this.iconCount = 0; // Sẽ được detect tự động
+    this.folderFileMapping = {}; // Map folder -> list of files
     this.imagesLoaded = false;
     this.displayIconsLoaded = false; // Track if display has loaded icons
     this.currentTheme = "output_3"; // Sử dụng output_3
@@ -1152,12 +1154,14 @@ class Game {
     return { center: bestCenter, count: bestCount };
   }
 
-  // Get display name with employee code (if available)
+  // Get employee code for display
+  getDisplayCode(duck) {
+    return duck.code || "";
+  }
+
+  // Get display name (without code)
   getDisplayName(duck) {
-    if (duck.code) {
-      return `${duck.code} - ${duck.name}`;
-    }
-    return duck.name;
+    return duck.name || "";
   }
 
   // loadPrizeNames() removed - prize names now come from scripts only
@@ -3107,9 +3111,11 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     }
   }
 
-  detectAndLoadDuckImages() {
-    // Tự động detect số folder có sẵn trong theme
-    console.log(`Starting icon detection for theme: ${this.currentTheme}`);
+  async detectAndLoadDuckImages() {
+    // Tự động detect tất cả folder và file có sẵn trong theme
+    console.log(
+      `Starting dynamic icon detection for theme: ${this.currentTheme}`,
+    );
 
     const iconCountEl = document.getElementById("iconCount");
     if (iconCountEl) {
@@ -3121,159 +3127,226 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       this.showLoading("Detecting icons...", 0);
     }
 
-    const maxFolders = 50; // Kiểm tra tối đa 50 folders
-    let detectedCount = 0;
-    let consecutiveFails = 0;
-    const maxFails = 3;
+    try {
+      // Bước 1: Detect tất cả thư mục con
+      const folders = await this.detectAllFolders();
 
-    const checkFolder = (folderNum) => {
-      const testImg = new Image();
-      const testPath = `${this.currentTheme}/${folderNum}/compressed_final_${folderNum}_1.webp`;
-      testImg.src = testPath;
+      if (folders.length === 0) {
+        console.error("No folders found in:", this.currentTheme);
+        if (document.getElementById("loadingContainer")) {
+          this.hideLoading();
+        }
+        if (!this.isDisplayMode) {
+          alert("No icon folders found! Please check the icon theme.");
+        }
+        return;
+      }
 
-      testImg.onload = () => {
-        console.log(`✓ Found folder ${folderNum}`);
-        detectedCount++;
-        consecutiveFails = 0;
+      console.log(`✅ Found ${folders.length} folders:`, folders);
 
-        const progress = Math.round((detectedCount / maxFolders) * 50); // 50% cho detection
+      // Bước 2: Detect tất cả file trong mỗi thư mục
+      this.folderFileMapping = {}; // {folderName: [file1, file2, ...]}
+
+      for (let i = 0; i < folders.length; i++) {
+        const folder = folders[i];
+        const files = await this.detectAllFilesInFolder(folder);
+
+        if (files.length > 0) {
+          this.folderFileMapping[folder] = files;
+          console.log(`✓ Folder ${folder}: ${files.length} files detected`);
+        }
+
+        const progress = Math.round(((i + 1) / folders.length) * 30); // 0-30% cho detection
         this.updateLoadingProgress(
-          `Detecting icons... (${detectedCount} found)`,
+          `Detecting files... ${i + 1}/${folders.length} folders`,
           progress,
         );
+      }
 
-        if (folderNum < maxFolders) {
-          checkFolder(folderNum + 1);
-        } else {
-          this.iconCount = detectedCount;
-          console.log(`Detection complete: ${detectedCount} folders found`);
-          document.getElementById("iconCount").textContent =
-            `${detectedCount} icons detected`;
-          this.loadAllDuckImages();
-        }
-      };
+      this.iconCount = folders.length;
+      const iconCountEl = document.getElementById("iconCount");
+      if (iconCountEl) {
+        iconCountEl.textContent = `${folders.length} icons detected`;
+      }
 
-      testImg.onerror = () => {
-        console.log(`✗ Folder ${folderNum} not found (path: ${testPath})`);
-        consecutiveFails++;
-        if (consecutiveFails < maxFails && folderNum < maxFolders) {
-          checkFolder(folderNum + 1);
-        } else {
-          // Kết thúc detection
-          this.iconCount = detectedCount;
-          console.log(
-            `Detection stopped at folder ${folderNum}. Total found: ${detectedCount}`,
-          );
-
-          const iconCountEl = document.getElementById("iconCount");
-          if (iconCountEl) {
-            iconCountEl.textContent = `${detectedCount} icons detected`;
-          }
-
-          if (detectedCount > 0) {
-            this.loadAllDuckImages();
-          } else {
-            console.error(
-              "No icons found! Check if files exist in:",
-              this.currentTheme,
-            );
-            if (document.getElementById("loadingContainer")) {
-              this.hideLoading();
-            }
-            if (!this.isDisplayMode) {
-              alert("No icons found! Please check the icon theme.");
-            }
-          }
-        }
-      };
-    };
-
-    checkFolder(1);
+      // Bước 3: Load tất cả các file
+      await this.loadAllDuckImages();
+    } catch (error) {
+      console.error("Error during icon detection:", error);
+      if (document.getElementById("loadingContainer")) {
+        this.hideLoading();
+      }
+      if (!this.isDisplayMode) {
+        alert("Error loading icons: " + error.message);
+      }
+    }
   }
 
-  loadAllDuckImages() {
-    if (this.iconCount === 0) {
+  async detectAllFolders() {
+    // Auto-detect folders từ 1 đến n
+    const folders = [];
+    const maxCheck = 50; // Check tối đa 50 folders
+    let consecutiveFails = 0;
+    const maxFails = 3; // Dừng sau 3 lần fail liên tiếp
+
+    for (let i = 1; i <= maxCheck; i++) {
+      const folderName = String(i);
+      const hasFiles = await this.checkFolderExists(folderName);
+
+      if (hasFiles) {
+        folders.push(folderName);
+        consecutiveFails = 0;
+      } else {
+        consecutiveFails++;
+        if (consecutiveFails >= maxFails) {
+          console.log(
+            `Stopped checking at folder ${i} after ${maxFails} consecutive fails`,
+          );
+          break;
+        }
+      }
+    }
+
+    console.log(`Detected ${folders.length} folders:`, folders);
+    return folders;
+  }
+
+  async checkFolderExists(folderName) {
+    // Chỉ check file compressed_frame_1.webp
+    const fileName = `compressed_frame_1.webp`;
+    const exists = await new Promise((resolve) => {
+      const testImg = new Image();
+      testImg.src = `${this.currentTheme}/${folderName}/${fileName}`;
+      const timeout = setTimeout(() => resolve(false), 100);
+
+      testImg.onload = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+      testImg.onerror = () => {
+        clearTimeout(timeout);
+        resolve(false);
+      };
+    });
+
+    return exists;
+  }
+
+  async detectAllFilesInFolder(folderName) {
+    // Mỗi folder có 3 file webp: compressed_frame_1.webp đến compressed_frame_3.webp
+    const files = [];
+    const totalFrames = 3;
+
+    for (let num = 1; num <= totalFrames; num++) {
+      const fileName = `compressed_frame_${num}.webp`;
+      const exists = await this.checkFileExists(folderName, fileName);
+
+      if (exists) {
+        files.push(fileName);
+      } else {
+        console.warn(`Missing frame ${num} in folder ${folderName}`);
+      }
+    }
+
+    console.log(`Folder ${folderName}: Found ${files.length}/3 frames`);
+    return files;
+  }
+
+  async checkFileExists(folderName, fileName) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = `${this.currentTheme}/${folderName}/${fileName}`;
+
+      const timeout = setTimeout(() => resolve(false), 100); // 100ms timeout
+
+      img.onload = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+
+      img.onerror = () => {
+        clearTimeout(timeout);
+        resolve(false);
+      };
+    });
+  }
+
+  async loadAllDuckImages() {
+    if (this.iconCount === 0 || !this.folderFileMapping) {
       console.warn("No icons detected!");
       this.hideLoading();
       return;
     }
 
-    // Load 3 frames từ mỗi folder
+    // Load tất cả file từ folderFileMapping
+    const folders = Object.keys(this.folderFileMapping).sort(
+      (a, b) => parseInt(a) - parseInt(b),
+    );
+    const totalFolders = folders.length;
     let loadedFolders = 0;
-    const totalFolders = this.iconCount;
+    let totalFiles = 0;
 
-    this.updateLoadingProgress(`Loading ${totalFolders} animated icons...`, 50);
+    // Đếm tổng số file
+    folders.forEach((folder) => {
+      totalFiles += this.folderFileMapping[folder].length;
+    });
 
-    for (let folderNum = 1; folderNum <= totalFolders; folderNum++) {
+    console.log(
+      `Loading ${totalFolders} folders with ${totalFiles} total files...`,
+    );
+    this.updateLoadingProgress(`Loading ${totalFolders} animated icons...`, 30);
+
+    // Reset duckImages
+    this.duckImages = [];
+
+    // Load từng folder
+    for (const folderName of folders) {
+      const files = this.folderFileMapping[folderName];
       const frames = [];
-      let loadedFrames = 0;
 
-      // Load 3 frames cho mỗi folder
-      for (let frameNum = 1; frameNum <= 3; frameNum++) {
-        const img = new Image();
-        img.src = `${this.currentTheme}/${folderNum}/compressed_final_${folderNum}_${frameNum}.webp`;
+      // Load tất cả file trong folder này
+      const loadPromises = files.map((fileName) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.src = `${this.currentTheme}/${folderName}/${fileName}`;
 
-        img.onload = () => {
-          loadedFrames++;
-          if (loadedFrames === 3) {
-            loadedFolders++;
-            const progress =
-              50 + Math.round((loadedFolders / totalFolders) * 50); // 50-100%
-            this.updateLoadingProgress(
-              `Loading icons: ${loadedFolders}/${totalFolders}`,
-              progress,
-            );
+          img.onload = () => {
+            frames.push(img);
+            resolve(true);
+          };
 
-            if (loadedFolders === totalFolders) {
-              this.imagesLoaded = true;
-              console.log(
-                `Loaded ${totalFolders} duck animations (3 frames each) from ${this.currentTheme}!`,
-              );
-              const iconCountEl = document.getElementById("iconCount");
-              if (iconCountEl) {
-                iconCountEl.textContent = `${totalFolders} icon (animated)`;
-              }
-              this.hideLoading();
-              this.enableStartButton();
-            }
-          }
-        };
+          img.onerror = () => {
+            console.warn(`Failed to load: ${img.src}`);
+            resolve(false);
+          };
+        });
+      });
 
-        img.onerror = () => {
-          console.warn(`Failed to load: ${img.src}`);
-          loadedFrames++;
-          if (loadedFrames === 3) {
-            loadedFolders++;
-            const progress =
-              50 + Math.round((loadedFolders / totalFolders) * 50);
-            this.updateLoadingProgress(
-              `Loading icons: ${loadedFolders}/${totalFolders}`,
-              progress,
-            );
+      await Promise.all(loadPromises);
 
-            if (loadedFolders === totalFolders) {
-              this.imagesLoaded = true;
-              const iconCountEl = document.getElementById("iconCount");
-              if (iconCountEl) {
-                iconCountEl.textContent = `${totalFolders} icon (animated)`;
-              }
-              this.hideLoading();
-              this.enableStartButton();
-            }
-          }
-        };
-
-        frames.push(img);
-      }
-
+      // Lưu frames cho folder này (ngay cả khi có file bị lỗi)
       this.duckImages.push(frames);
+
+      loadedFolders++;
+      const progress = 30 + Math.round((loadedFolders / totalFolders) * 70); // 30-100%
+      this.updateLoadingProgress(
+        `Loading icons: ${loadedFolders}/${totalFolders}`,
+        progress,
+      );
     }
 
-    // Cập nhật UI ngay lập tức
+    this.imagesLoaded = true;
+    console.log(
+      `✅ Loaded ${totalFolders} duck animations (${totalFiles} total frames) from ${this.currentTheme}!`,
+    );
+
     const iconCountEl = document.getElementById("iconCount");
     if (iconCountEl) {
-      iconCountEl.textContent = `Loading ${totalFolders} animated ducks...`;
+      iconCountEl.textContent = `${totalFolders} icons (${totalFiles} frames)`;
     }
+
+    this.hideLoading();
+    this.enableStartButton();
   }
 
   preloadDuckImages() {
@@ -3483,12 +3556,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     if (fileName && this.duckNames.length > 0) {
       if (fileLabel)
         fileLabel.innerHTML = `Racer List File <span style="color: #4CAF50;">(✓ Loaded: ${fileName})</span>:`;
-      if (clearBtn) clearBtn.style.display = "inline-block";
+      // Clear button always visible
       if (fileHelp)
         fileHelp.innerHTML = `<span style="color: #4CAF50;">✓ Using ${this.duckNames.length} names from file. Click Clear to use random names instead.</span>`;
     } else {
       if (fileLabel) fileLabel.textContent = "Racer List File (CSV/Excel):";
-      if (clearBtn) clearBtn.style.display = "none";
+      // Clear button always visible
       if (fileHelp)
         fileHelp.innerHTML =
           "Upload CSV/Excel to use custom names, or leave empty for random names";
@@ -3537,12 +3610,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     if (fileName) {
       if (audioLabel)
         audioLabel.innerHTML = `Custom Race Sound <span style="color: #2ed573;">(✓ Loaded: ${fileName})</span>:`;
-      if (clearBtn) clearBtn.style.display = "inline-block";
+      // Clear button always visible
       // Save to localStorage
       localStorage.setItem("customAudioFileName", fileName);
     } else {
       if (audioLabel) audioLabel.innerHTML = "Custom Race Sound (MP3):";
-      if (clearBtn) clearBtn.style.display = "none";
+      // Clear button always visible
       // Remove from localStorage
       localStorage.removeItem("customAudioFileName");
     }
@@ -4786,11 +4859,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         }
 
         // Don't show popup - only show result panel
-        // Show result panel immediately after race ends
+        // Show result panel after countdown
         if (!this.isDisplayMode) {
-          setTimeout(() => {
-            this.showWinnersPanel();
-          }, 1000);
+          this.showResultsCountdown(5);
         }
       }
     }
@@ -4816,16 +4887,33 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       timestamp: new Date().toLocaleString("vi-VN"),
     });
 
-    // Update UI
-    safeElementAction("raceStatus", (el) => (el.textContent = "Finished!"));
+    // Update UI - Start countdown
+    this.showResultsCountdown(5);
     safeElementAction("timeLeft", (el) => (el.textContent = "0s"));
-    safeElementAction("pauseBtn", (el) => (el.disabled = true));
 
-    // Show Next Race button after race finishes
-    safeElementAction(
-      "nextRaceBtn",
-      (el) => (el.style.display = "inline-block"),
-    );
+    // Disable all control buttons except Next button to prevent user errors
+    safeElementAction("controlStartBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("pauseBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resumeBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resetHistoryBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+
+    // Next Race button will be shown after result panel is displayed
   }
 
   updateControlPanelTimer() {
@@ -5660,14 +5748,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
             continue; // Skip this duck, still in cooldown
           }
 
-          // Don't perform last-moment lane switches when too close to finish
-          const FINISH_SAFE_ZONE = this.finishSafeZone ?? 80; // pixels (nullish coalescing keeps 0 as valid)
-          if (
-            duck.position >=
-            this.trackLength - FINISH_LINE_OFFSET - FINISH_SAFE_ZONE
-          ) {
-            continue; // Too close to finish - keep lane to avoid jumpy behavior
-          }
+          // Lane switching is now allowed at all positions (safe zone disabled)
+          // Previously: disabled lane switching near finish line to avoid jumpy behavior
+          // const FINISH_SAFE_ZONE = this.finishSafeZone ?? 80;
+          // if (duck.position >= this.trackLength - FINISH_LINE_OFFSET - FINISH_SAFE_ZONE) {
+          //   continue;
+          // }
 
           // Find least crowded ADJACENT lane (only +1 or -1 from current lane)
           const possibleLanes = [];
@@ -6381,11 +6467,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       }
 
       // Don't show popup - only show result panel
-      // Show result panel immediately
+      // Show result panel after countdown
       if (!this.isDisplayMode) {
-        setTimeout(() => {
-          this.showWinnersPanel();
-        }, 1000);
+        this.showResultsCountdown(5);
       }
     }
 
@@ -6406,33 +6490,34 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       timestamp: new Date().toLocaleString("vi-VN"),
     });
 
-    safeElementAction("raceStatus", (el) => (el.textContent = "Finished!"));
+    // Start countdown before showing results (standalone mode)
+    this.showResultsCountdown(5);
     safeElementAction("timeLeft", (el) => (el.textContent = "0s"));
-    safeElementAction("pauseBtn", (el) => (el.disabled = true));
 
-    const resultPanel = document.getElementById("resultPanel");
-    if (resultPanel) resultPanel.classList.remove("hidden");
+    // Disable all control buttons except Next button to prevent user errors
+    safeElementAction("controlStartBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("pauseBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resumeBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resetHistoryBtn", (el) => {
+      el.disabled = true;
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
 
-    safeElementAction(
-      "resultTitle",
-      (el) =>
-        (el.innerHTML = `🏆 Race Finished! <span style="font-size:0.6em;color:#888;">(Top ${this.winnerCount})</span>`),
-    );
-
-    let resultHTML = `
-            <div class="result-winner">
-                <h3>🏆 Winner: ${winner.name} 🏆</h3>
-                <div style="width:30px;height:30px;background:${winner.color};border-radius:50%;margin:10px auto;"></div>
-            </div>
-            <div class="result-stats">
-                <p><strong>Top 3:</strong></p>
-                <p>🥇 ${this.rankings[0].name} - ${((this.rankings[0].position / this.trackLength) * 100).toFixed(1)}%</p>
-                <p>🥈 ${this.rankings[1].name} - ${((this.rankings[1].position / this.trackLength) * 100).toFixed(1)}%</p>
-                <p>🥉 ${this.rankings[2].name} - ${((this.rankings[2].position / this.trackLength) * 100).toFixed(1)}%</p>
-            </div>
-        `;
-
-    document.getElementById("resultMessage").innerHTML = resultHTML;
+    // Result panel will be shown by countdown after 5 seconds
+    // No need to show it immediately here as showResultsCountdown() handles it
   }
 
   // showVictoryPopup(winner) {
@@ -6607,12 +6692,16 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         }
       }
 
+      const displayCode = this.getDisplayCode(winner);
+      const displayName = this.getDisplayName(winner);
+
       winnersHTML += `
             <div class="topn-winner-card">
               <div class="topn-winner-medal">${medal}</div>
               <div class="topn-winner-icon">${iconHTML}</div>
               <div class="topn-winner-position">${prizeName}</div>
-              <div class="topn-winner-name">${this.getDisplayName(winner)}</div>
+              ${displayCode ? `<div class="topn-winner-code">${displayCode}</div>` : ""}
+              <div class="topn-winner-name">${displayName}</div>
             </div>
           `;
 
@@ -6816,6 +6905,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   nextRace() {
     console.log("Next Race - Resetting display to waiting screen");
 
+    // Clear countdown interval if running
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+
     // Hide popup on display if showing
     if (this.displayChannel) {
       this.displayChannel.postMessage({
@@ -6832,12 +6927,45 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       });
     }
 
-    // Hide Next Race button
-    safeElementAction("nextRaceBtn", (el) => (el.style.display = "none"));
+    // Hide Next Race button and remove blinking effect
+    safeElementAction("nextRaceBtn", (el) => {
+      el.style.display = "none";
+      el.classList.remove("btn-blinking");
+    });
+
+    // Re-enable all control buttons for next race
+    safeElementAction("controlStartBtn", (el) => {
+      el.disabled = false;
+      el.style.opacity = "1";
+      el.style.cursor = "pointer";
+    });
+    safeElementAction("pauseBtn", (el) => {
+      el.disabled = false;
+      el.style.opacity = "1";
+      el.style.cursor = "pointer";
+    });
+    safeElementAction("resumeBtn", (el) => {
+      el.disabled = true; // Will be enabled when paused
+      el.style.opacity = "0.5";
+      el.style.cursor = "not-allowed";
+    });
+    safeElementAction("resetHistoryBtn", (el) => {
+      el.disabled = false;
+      el.style.opacity = "1";
+      el.style.cursor = "pointer";
+    });
 
     // Hide result panel on control
     const resultPanel = document.getElementById("resultPanel");
     if (resultPanel) resultPanel.classList.add("hidden");
+
+    // Reset race status display
+    safeElementAction("raceStatus", (el) => {
+      el.textContent = "Waiting";
+      el.style.color = "";
+      el.style.fontWeight = "";
+      el.style.fontSize = "";
+    });
 
     console.log("✓ Display reset to waiting screen, ready for next race");
   }
@@ -6891,12 +7019,16 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           }
         }
 
+        const displayCode = this.getDisplayCode(winner);
+        const displayName = this.getDisplayName(winner);
+
         html += `
                     <div class="winner-card">
                         <div class="winner-medal">${medal}</div>
                         <div class="winner-icon-display">${iconHTML}</div>
                         <div class="winner-position">${prizeName}</div>
-                        <div class="winner-duck-name">${this.getDisplayName(winner)}</div>
+                        ${displayCode ? `<div class="winner-duck-code">${displayCode}</div>` : ""}
+                        <div class="winner-duck-name">${displayName}</div>
                     </div>
                 `;
       });
@@ -6908,7 +7040,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     html += "</div>";
     html += '<div class="result-actions" id="resultActions">';
     html +=
-      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 Send to Display</button>';
+      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 SEND TO DISPLAY</button>';
+    html +=
+      '<button class="btn btn-secondary" onclick="game.resetHistory()" style="background: #e74c3c; margin-left: 10px;">🗑️ CLEAR HISTORY</button>';
     html += "</div>";
 
     document.getElementById("resultMessage").innerHTML = html;
@@ -6920,6 +7054,47 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     // Play celebration sound
     this.soundManager.playCrowdCheer();
+  }
+
+  // Countdown before showing results panel
+  showResultsCountdown(seconds) {
+    let remaining = seconds;
+    const raceStatusEl = document.getElementById("raceStatus");
+
+    if (!raceStatusEl) return;
+
+    // Clear any existing countdown interval
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
+
+    // Update countdown display
+    const updateCountdown = () => {
+      if (remaining > 0) {
+        raceStatusEl.textContent = `🏁 Calculating results... ${remaining}s`;
+        raceStatusEl.style.color = "#f39c12";
+        raceStatusEl.style.fontWeight = "bold";
+        raceStatusEl.style.fontSize = "1.2em";
+        remaining--;
+      } else {
+        // Countdown finished
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+        raceStatusEl.textContent = "Finished!";
+        raceStatusEl.style.color = "";
+        raceStatusEl.style.fontWeight = "";
+        raceStatusEl.style.fontSize = "";
+
+        // Show results panel
+        this.showWinnersPanel();
+      }
+    };
+
+    // Start countdown immediately
+    updateCountdown();
+
+    // Update every second
+    this.countdownInterval = setInterval(updateCountdown, 1000);
   }
 
   showWinnersPanel() {
@@ -6942,11 +7117,15 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `🏅`;
         // Always use prizeName from winner object (set by script)
         const prizeName = winner.prizeName || this.currentScriptPrizeName || "";
+        const displayCode = this.getDisplayCode(winner);
+        const displayName = this.getDisplayName(winner);
+
         html += `
                     <div class="winner-card">
                         <div class="winner-medal">${medal}</div>
                         <div class="winner-position">${prizeName}</div>
-                        <div class="winner-duck-name">${this.getDisplayName(winner)}</div>
+                        ${displayCode ? `<div class="winner-duck-code">${displayCode}</div>` : ""}
+                        <div class="winner-duck-name">${displayName}</div>
                     </div>
                 `;
       });
@@ -6958,9 +7137,11 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     html += "</div>";
     html += '<div class="result-actions" id="resultActions">';
     html +=
-      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 Send to Display</button>';
+      '<button class="btn btn-primary" onclick="game.playAgain()" style="background: #27ae60; margin-right: 10px;">🔄 PLAY AGAIN</button>';
     html +=
-      '<button class="btn btn-secondary" onclick="game.resetHistory()">🗑️ Clear History</button>';
+      '<button class="btn btn-secondary" onclick="game.sendResultsToDisplay()">📺 SEND TO DISPLAY</button>';
+    html +=
+      '<button class="btn btn-secondary" onclick="game.resetHistory()" style="background: #e74c3c; margin-left: 10px;">🗑️ CLEAR HISTORY</button>';
     html += "</div>";
 
     document.getElementById("resultMessage").innerHTML = html;
@@ -6969,6 +7150,63 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     setTimeout(() => {
       resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
+
+    // Show Next Race button with blinking effect after result panel is displayed
+    safeElementAction("nextRaceBtn", (el) => {
+      el.style.display = "inline-block";
+      el.classList.add("btn-blinking");
+    });
+  }
+
+  playAgain() {
+    console.log("🔄 Play Again: Restarting race with same settings");
+
+    // Hide result panel
+    const resultPanel = document.getElementById("resultPanel");
+    if (resultPanel) {
+      resultPanel.classList.add("hidden");
+    }
+
+    // Hide Next Race button
+    safeElementAction("nextRaceBtn", (el) => {
+      el.style.display = "none";
+      el.classList.remove("btn-blinking");
+    });
+
+    // Reset race status
+    this.raceStarted = false;
+    this.raceFinished = false;
+    this.racePaused = false;
+    this.finishTime = null;
+
+    // Clear countdown interval if any
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+
+    // Reset race status display
+    const raceStatusEl = document.getElementById("raceStatus");
+    if (raceStatusEl) {
+      raceStatusEl.textContent = "Ready";
+      raceStatusEl.style.color = "";
+      raceStatusEl.style.fontWeight = "";
+      raceStatusEl.style.fontSize = "";
+    }
+
+    // Re-enable START button
+    const startBtn = document.getElementById("controlStartBtn");
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.style.opacity = "1";
+      startBtn.textContent = "▶ START";
+      startBtn.classList.add("btn-blinking");
+    }
+
+    // Scroll back to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    console.log("✅ Ready to start new race. Press START button.");
   }
 
   sendResultsToDisplay() {
@@ -7004,6 +7242,12 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         "⚠️ RESTART: Xóa toàn bộ lịch sử, scripts và reset game về trạng thái ban đầu?\n\nKhông thể hoàn tác!",
       )
     ) {
+      // Clear countdown interval if running
+      if (this.countdownInterval) {
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+      }
+
       this.winners = [];
       this.activeDuckNames = [...this.duckNames];
       this.usedPrizesCount = 0; // Reset prize counter
