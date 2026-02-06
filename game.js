@@ -4402,8 +4402,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     const nameLabel = document.createElement("span");
     nameLabel.className = "duck-name";
-    nameLabel.textContent =
-      duck.name.length > 20 ? duck.name.substring(0, 18) + ".." : duck.name;
+    nameLabel.textContent = duck.name;
     // Ban đầu duck-name ở sau icon
     duckEl.appendChild(nameLabel);
     // Nếu đã về đích thì chuyển dần duck-name ra trước icon
