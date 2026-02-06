@@ -163,18 +163,24 @@
       }
 
       .result-panel.fullscreen .winner-card {
-        flex: 1 1 0 !important;
-        min-width: 160px !important;
-        max-width: 200px !important;
-        width: 100% !important;
+        flex: 0 1 auto !important;
+        /* Scale card height relative to race-track height so cards keep consistent size on different aspect ratios */
+        height: calc(
+          (100vw * var(--track-h) / var(--track-w)) * 0.28
+        ) !important;
+        min-height: 120px !important;
+        max-height: calc(
+          (100vw * var(--track-h) / var(--track-w)) * 0.42
+        ) !important;
+        width: auto !important;
         padding: 2% !important;
-        /* border-radius: 8px !important; */
         box-sizing: border-box !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
         aspect-ratio: 1 / 1.4 !important;
+        overflow: hidden !important;
       }
 
       .result-panel.fullscreen .winner-medal {
@@ -346,8 +352,15 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        background-image: url("static/popup.png") !important;
-        background-repeat: round !important;
+        /* Use CSS variables so JS can override without fighting !important rules */
+        background-image: var(
+          --victory-popup-bg,
+          url("static/popup.png")
+        ) !important;
+        background-repeat: var(--victory-popup-repeat, round) !important;
+        background-size: var(--victory-popup-size, cover) !important;
+        background-position: var(--victory-popup-position, center) !important;
+        background-color: var(--victory-popup-color, transparent) !important;
       }
 
       /* Victory overlay - fill entire popup container */
@@ -528,9 +541,9 @@
       .topn-winner-card {
         background: transparent !important;
         /* border-radius: 12px !important; */
-        width: fit-content !important;
-        max-width: none !important; /* bỏ giới hạn 150px */
-        min-width: 100px !important; /* giữ min cho đẹp layout */
+        width: auto !important;
+        max-width: none !important; /* no fixed max */
+        min-width: 100px !important; /* keep a minimum for layout */
         padding: 10px 14px !important;
 
         display: flex !important;
@@ -538,16 +551,23 @@
         align-items: center !important;
         justify-content: center !important;
         gap: 0.3em !important;
-        flex: 0 1 auto !important;
+        flex: 0 0 auto !important;
 
-        height: auto !important;
+        /* Scale top-N winner card by race-track height */
+        height: calc(
+          (100vw * var(--track-h) / var(--track-w)) * 0.65
+        ) !important;
+        max-height: calc(
+          (100vw * var(--track-h) / var(--track-w)) * 0.9
+        ) !important;
+        min-height: 120px !important;
 
         /* Hiệu ứng nhấp nháy */
         animation: winnerPulse 1.5s ease-in-out infinite;
       }
 
       .topn-winner-medal {
-        font-size: clamp(3em, 6vw, 6em) !important;
+        font-size: clamp(1em, 3vw, 3em) !important;
         margin: 0.1em 0 !important;
         line-height: 1 !important;
         animation: winnerSpin 2s ease-in-out infinite !important;
@@ -555,8 +575,13 @@
       }
 
       .topn-winner-icon {
-        width: clamp(240px, 10vw, 240px) !important;
-        height: clamp(240px, 10vw, 240px) !important;
+        /* Scale icon relative to race-track height to keep consistent size */
+        width: calc(
+          (100vw * var(--track-h) / var(--track-w)) * 0.45
+        ) !important;
+        height: calc(
+          (100vw * var(--track-h) / var(--track-w)) * 0.45
+        ) !important;
         margin: 0.2em 0 !important;
         display: flex !important;
         align-items: center !important;
@@ -1746,43 +1771,74 @@
           const applyTo = (el) => {
             if (!el) return;
             if (data.type === "default") {
+              // Reset CSS variables and inline background properties
+              el.style.removeProperty("--victory-popup-bg");
+              el.style.removeProperty("--victory-popup-repeat");
+              el.style.removeProperty("--victory-popup-size");
+              el.style.removeProperty("--victory-popup-position");
+              el.style.removeProperty("--victory-popup-color");
               el.style.removeProperty("background");
               el.style.removeProperty("background-image");
-              el.style.removeProperty("background-size");
-              el.style.removeProperty("background-position");
-              el.style.removeProperty("background-repeat");
-              el.style.removeProperty("background-color");
               el.classList.remove("custom-background");
-              console.log("✓ Popup background reset to default");
+              console.log("✓ Popup background reset to default (vars cleared)");
             } else {
               el.classList.add("custom-background");
               if (data.type === "color") {
-                el.style.setProperty("background", data.color, "important");
-                el.style.removeProperty("background-image");
-                console.log("✓ Popup color applied:", data.color);
-              } else if (data.type === "image" && data.image) {
+                // Use CSS variable for color to avoid being overridden by stylesheet
                 el.style.setProperty(
-                  "background-image",
-                  `url(${data.image})`,
+                  "--victory-popup-color",
+                  data.color,
                   "important",
                 );
-                el.style.setProperty("background-size", "cover", "important");
+                // Ensure any background image is disabled
+                el.style.setProperty("--victory-popup-bg", "none", "important");
                 el.style.setProperty(
-                  "background-position",
-                  "center",
-                  "important",
-                );
-                el.style.setProperty(
-                  "background-repeat",
+                  "--victory-popup-repeat",
                   "no-repeat",
                   "important",
                 );
                 el.style.setProperty(
-                  "background-color",
+                  "--victory-popup-size",
+                  "auto",
+                  "important",
+                );
+                el.style.setProperty(
+                  "--victory-popup-position",
+                  "center",
+                  "important",
+                );
+                console.log(
+                  "✓ Popup color applied (via CSS variable):",
+                  data.color,
+                );
+              } else if (data.type === "image" && data.image) {
+                // Set variables so CSS picks them up even when stylesheet has !important
+                el.style.setProperty(
+                  "--victory-popup-bg",
+                  `url(${data.image})`,
+                  "important",
+                );
+                el.style.setProperty(
+                  "--victory-popup-size",
+                  "cover",
+                  "important",
+                );
+                el.style.setProperty(
+                  "--victory-popup-position",
+                  "center",
+                  "important",
+                );
+                el.style.setProperty(
+                  "--victory-popup-repeat",
+                  "no-repeat",
+                  "important",
+                );
+                el.style.setProperty(
+                  "--victory-popup-color",
                   "transparent",
                   "important",
                 );
-                console.log("✓ Popup image applied");
+                console.log("✓ Popup image applied (via CSS variable)");
               }
             }
             if (data.type)

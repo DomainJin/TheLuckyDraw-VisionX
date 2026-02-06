@@ -2909,84 +2909,29 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       console.log("No popup file selected; set to default static/popup.png");
       return;
     }
-
     const reader = new FileReader();
     reader.onload = async (e) => {
       const imageData = e.target.result;
-
-      // Try server upload; if server not available or response not JSON, fallback to saving Data-URL locally
       try {
         const res = await fetch("/api/upload-popup-bg", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ imageData, fileName: file.name }),
         });
-
-        let data = null;
-        try {
-          data = await res.json();
-        } catch (parseErr) {
-          // Response was not JSON: fallback
-          const text = await res.text();
-          console.warn("Upload response not JSON:", text);
-          throw new Error(
-            "Upload failed or server returned non-JSON response: " +
-              (text || "no response"),
-          );
-        }
-
-        if (res.ok && data && data.ok && data.url) {
+        const data = await res.json();
+        if (data.ok && data.url) {
           localStorage.setItem("victoryPopupBackgroundImageUrl", data.url);
           console.log("Popup image uploaded:", data.url);
           alert("Upload successful");
-          // Auto-select image type and apply settings so display updates immediately
-          const bgTypeEl = document.getElementById("popupBgType");
-          if (bgTypeEl) {
-            bgTypeEl.value = "image";
-            this.togglePopupBackground();
-          }
-          try {
-            this.applyVictoryPopupSettings();
-          } catch (e) {
-            console.warn("Failed to auto-apply popup settings:", e);
-          }
         } else {
           console.error("Upload failed", data);
-          throw new Error(data && data.error ? data.error : "Upload failed");
+          alert("Upload failed: " + (data.error || "unknown"));
         }
       } catch (err) {
-        // Fallback: save Data-URL in localStorage so the display can use it
-        console.warn(
-          "Upload error or server unavailable, falling back to local Data-URL:",
-          err,
-        );
-        try {
-          localStorage.setItem("victoryPopupBackgroundImageUrl", imageData);
-          alert(
-            "Upload failed or server unavailable. Image saved locally (Data-URL) and will be used for popup when control and display are on the same machine.",
-          );
-          console.log("Popup image saved as data-URL in localStorage");
-
-          // Auto-select image type and apply settings so display updates immediately
-          const bgTypeEl = document.getElementById("popupBgType");
-          if (bgTypeEl) {
-            bgTypeEl.value = "image";
-            this.togglePopupBackground();
-          }
-          try {
-            this.applyVictoryPopupSettings();
-          } catch (e) {
-            console.warn("Failed to auto-apply popup settings (fallback):", e);
-          }
-        } catch (storageErr) {
-          console.error("Failed to save image to localStorage:", storageErr);
-          alert(
-            "Failed to upload and couldn't save locally: " + storageErr.message,
-          );
-        }
+        console.error("Upload error", err);
+        alert("Upload error: " + err.message);
       }
     };
-
     reader.readAsDataURL(file);
   }
 
@@ -3016,29 +2961,46 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   applyVictoryPopupBackgroundToDisplay(data) {
     const applyToEl = (el) => {
       if (!el) return;
+      // Reset first
       el.classList.remove("custom-background");
       if (data.type === "default") {
+        el.style.removeProperty("--victory-popup-bg");
+        el.style.removeProperty("--victory-popup-repeat");
+        el.style.removeProperty("--victory-popup-size");
+        el.style.removeProperty("--victory-popup-position");
+        el.style.removeProperty("--victory-popup-color");
         el.style.removeProperty("background");
         el.style.removeProperty("background-image");
-        el.style.removeProperty("background-size");
-        el.style.removeProperty("background-position");
-        el.style.removeProperty("background-repeat");
-        el.style.removeProperty("background-color");
         el.classList.remove("custom-background");
       } else if (data.type === "color") {
-        el.style.setProperty("background", data.color, "important");
-        el.style.removeProperty("background-image");
+        el.style.setProperty("--victory-popup-color", data.color, "important");
+        el.style.setProperty("--victory-popup-bg", "none", "important");
+        el.style.setProperty(
+          "--victory-popup-repeat",
+          "no-repeat",
+          "important",
+        );
+        el.style.setProperty("--victory-popup-size", "auto", "important");
+        el.style.setProperty("--victory-popup-position", "center", "important");
         el.classList.add("custom-background");
       } else if (data.type === "image" && data.image) {
         el.style.setProperty(
-          "background-image",
+          "--victory-popup-bg",
           `url(${data.image})`,
           "important",
         );
-        el.style.setProperty("background-size", "cover", "important");
-        el.style.setProperty("background-position", "center", "important");
-        el.style.setProperty("background-repeat", "no-repeat", "important");
-        el.style.setProperty("background-color", "transparent", "important");
+        el.style.setProperty("--victory-popup-size", "cover", "important");
+        el.style.setProperty("--victory-popup-position", "center", "important");
+        el.style.setProperty(
+          "--victory-popup-repeat",
+          "no-repeat",
+          "important",
+        );
+        el.style.setProperty(
+          "--victory-popup-color",
+          "transparent",
+          "important",
+        );
         el.classList.add("custom-background");
       }
     };
@@ -3057,6 +3019,11 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     const topn = document.getElementById("topNVictoryPopup");
     [vp, topn].forEach((el) => {
       if (el) {
+        el.style.removeProperty("--victory-popup-bg");
+        el.style.removeProperty("--victory-popup-repeat");
+        el.style.removeProperty("--victory-popup-size");
+        el.style.removeProperty("--victory-popup-position");
+        el.style.removeProperty("--victory-popup-color");
         el.style.removeProperty("background");
         el.style.removeProperty("background-image");
         el.style.removeProperty("background-size");
