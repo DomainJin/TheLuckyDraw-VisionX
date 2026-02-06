@@ -20,7 +20,7 @@
   </head>
   <body>
     <!-- Login Modal - 3D Flip Card -->
-    <div
+    <!-- <div
       id="loginModal"
       style="
         position: fixed;
@@ -208,10 +208,10 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
     <!-- Remove tab navigation, keep single page -->
-    <div class="container" id="mainContent" style="display: none">
-      <!-- <div class="container" id="mainContent"> -->
+    <!-- <div class="container" id="mainContent" style="display: none"> -->
+    <div class="container" id="mainContent">
       <!-- Chức năng admin: generate mật khẩu -->
       <div id="adminPanel" style="display: none; margin-bottom: 24px">
         <h3 style="color: #ffd700">🔑 Admin Panel</h3>
@@ -657,6 +657,105 @@
           </div>
           <!-- end audioContainer -->
         </div>
+
+        <!-- Back ground popup custom-->
+        <div
+          style="
+            margin: 20px 0;
+            padding: 18px;
+            background: rgba(255, 105, 180, 0.1);
+            border: 1px solid #ff69b4;
+            border-radius: 10px;
+          "
+        >
+          <h3
+            style="
+              color: #ff69b4;
+              margin: 0 0 12px 0;
+              font-size: 17px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+            "
+          >
+            <span>🌆 Background Popup Custom</span>
+            <button
+              class="btn btn-small"
+              onclick="game.toggleBackgroundPopupSection()"
+              style="
+                background: #ff69b4;
+                padding: 5px 12px;
+                font-size: 14px;
+                margin: 0;
+              "
+            >
+              −
+            </button>
+          </h3>
+
+          <div id="popupBackgroundContainer" style="margin-top: 12px">
+            <div class="input-group">
+              <label for="popupBgType">Popup Background Type:</label>
+              <select id="popupBgType" onchange="game.togglePopupBackground()">
+                <option value="default">Default</option>
+                <option value="color">Solid Color</option>
+                <option value="image">Custom Image</option>
+              </select>
+            </div>
+
+            <div
+              class="input-group"
+              id="popupBgColorGroup"
+              style="display: none"
+            >
+              <label for="popupBgColor">Background Color:</label>
+              <input type="color" id="popupBgColor" value="#1a1a2e" />
+            </div>
+
+            <div
+              class="input-group"
+              id="popupBgImageGroup"
+              style="display: none"
+            >
+              <label for="popupBgImage"
+                >Background Image (server upload):</label
+              >
+              <input
+                type="file"
+                id="popupBgImage"
+                accept="image/*"
+                onchange="game.loadPopupBackgroundImage(event)"
+              />
+              <small style="color: #888"
+                >Upload JPG, PNG, or GIF — uploaded to server</small
+              >
+            </div>
+
+            <div style="margin-top: 12px" class="input-group">
+              <button
+                class="btn btn-small"
+                onclick="game.applyVictoryPopupSettings()"
+                style="background: #ff69b4; margin-right: 8px"
+              >
+                ✓ Apply
+              </button>
+              <button
+                class="btn btn-small"
+                onclick="game.resetVictoryPopupSettings()"
+                style="background: #888"
+              >
+                ⟲ Reset
+              </button>
+            </div>
+
+            <small style="color: #888; display: block; margin-top: 8px"
+              >Note: images are uploaded to the server and used by the display
+              window.</small
+            >
+          </div>
+        </div>
+        <!-- end back ground popup custom-->
 
         <!-- Display Settings Section -->
         <div
@@ -1557,6 +1656,7 @@
           game.renderPrizeRaceUI && game.renderPrizeRaceUI();
           game.renderPrizeAssignmentUI && game.renderPrizeAssignmentUI();
           game.loadResultPanelSettings && game.loadResultPanelSettings();
+          game.loadVictoryPopupSettings && game.loadVictoryPopupSettings();
         }
       }
       // Hàm sinh mật khẩu ngẫu nhiên
@@ -1776,6 +1876,10 @@
         // Render race scripts to show existing scripts
         if (window.game && game.renderRaceScripts) {
           game.renderRaceScripts();
+        }
+        // Load victory popup settings after game initialization
+        if (window.game && game.loadVictoryPopupSettings) {
+          game.loadVictoryPopupSettings();
         }
       }, 500);
     </script>

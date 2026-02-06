@@ -996,6 +996,10 @@
               console.log("🎨 UPDATE_RESULT_PANEL_SETTINGS received:", data);
               handleUpdateResultPanelSettings(data);
               break;
+            case "UPDATE_VICTORY_POPUP_SETTINGS":
+              console.log("🎨 UPDATE_VICTORY_POPUP_SETTINGS received:", data);
+              handleUpdateVictoryPopupSettings(data);
+              break;
             case "FINISH_SAFE_ZONE_UPDATED":
               console.log("📏 FINISH_SAFE_ZONE_UPDATED received:", data);
               if (displayGame) {
@@ -1735,6 +1739,85 @@
           });
 
           console.log("✓ Loaded saved result panel settings from localStorage");
+        }
+
+        function handleUpdateVictoryPopupSettings(data) {
+          console.log("🎨 Applying victory popup settings on display:", data);
+          const applyTo = (el) => {
+            if (!el) return;
+            if (data.type === "default") {
+              el.style.removeProperty("background");
+              el.style.removeProperty("background-image");
+              el.style.removeProperty("background-size");
+              el.style.removeProperty("background-position");
+              el.style.removeProperty("background-repeat");
+              el.style.removeProperty("background-color");
+              el.classList.remove("custom-background");
+              console.log("✓ Popup background reset to default");
+            } else {
+              el.classList.add("custom-background");
+              if (data.type === "color") {
+                el.style.setProperty("background", data.color, "important");
+                el.style.removeProperty("background-image");
+                console.log("✓ Popup color applied:", data.color);
+              } else if (data.type === "image" && data.image) {
+                el.style.setProperty(
+                  "background-image",
+                  `url(${data.image})`,
+                  "important",
+                );
+                el.style.setProperty("background-size", "cover", "important");
+                el.style.setProperty(
+                  "background-position",
+                  "center",
+                  "important",
+                );
+                el.style.setProperty(
+                  "background-repeat",
+                  "no-repeat",
+                  "important",
+                );
+                el.style.setProperty(
+                  "background-color",
+                  "transparent",
+                  "important",
+                );
+                console.log("✓ Popup image applied");
+              }
+            }
+            if (data.type)
+              localStorage.setItem("victoryPopupBackgroundType", data.type);
+            if (data.color)
+              localStorage.setItem("victoryPopupBackgroundColor", data.color);
+            if (data.image)
+              localStorage.setItem(
+                "victoryPopupBackgroundImageUrl",
+                data.image,
+              );
+          };
+          applyTo(document.getElementById("victoryPopup"));
+          applyTo(document.getElementById("topNVictoryPopup"));
+        }
+
+        // Load victory popup settings (if any)
+        const victoryPopupType = localStorage.getItem(
+          "victoryPopupBackgroundType",
+        );
+        if (victoryPopupType && victoryPopupType !== "default") {
+          const victoryPopupColor = localStorage.getItem(
+            "victoryPopupBackgroundColor",
+          );
+          const victoryPopupImage = localStorage.getItem(
+            "victoryPopupBackgroundImageUrl",
+          );
+          handleUpdateVictoryPopupSettings({
+            type: victoryPopupType,
+            color: victoryPopupColor,
+            image: victoryPopupImage,
+          });
+          console.log(
+            "✓ Loaded saved victory popup settings from localStorage",
+          );
         }
 
         // Load race track aspect ratio settings

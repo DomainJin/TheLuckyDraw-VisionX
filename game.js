@@ -2874,6 +2874,240 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     });
   }
 
+  // Popup background controls
+  togglePopupBackground() {
+    const bgType = document.getElementById("popupBgType")?.value;
+    const colorGroup = document.getElementById("popupBgColorGroup");
+    const imageGroup = document.getElementById("popupBgImageGroup");
+    if (colorGroup) colorGroup.style.display = "none";
+    if (imageGroup) imageGroup.style.display = "none";
+
+    if (bgType === "color" && colorGroup) {
+      colorGroup.style.display = "block";
+    } else if (bgType === "image" && imageGroup) {
+      imageGroup.style.display = "block";
+    }
+  }
+
+  toggleBackgroundPopupSection() {
+    const container = document.getElementById("popupBackgroundContainer");
+    if (!container) return;
+    if (!container.style.display || container.style.display === "none") {
+      container.style.display = "block";
+    } else {
+      container.style.display = "none";
+    }
+  }
+
+  async loadPopupBackgroundImage(event) {
+    const file = event.target.files[0];
+    if (!file) {
+      localStorage.setItem(
+        "victoryPopupBackgroundImageUrl",
+        "static/popup.png",
+      );
+      console.log("No popup file selected; set to default static/popup.png");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const imageData = e.target.result;
+
+      // Try server upload; if server not available or response not JSON, fallback to saving Data-URL locally
+      try {
+        const res = await fetch("/api/upload-popup-bg", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageData, fileName: file.name }),
+        });
+
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          // Response was not JSON: fallback
+          const text = await res.text();
+          console.warn("Upload response not JSON:", text);
+          throw new Error(
+            "Upload failed or server returned non-JSON response: " +
+              (text || "no response"),
+          );
+        }
+
+        if (res.ok && data && data.ok && data.url) {
+          localStorage.setItem("victoryPopupBackgroundImageUrl", data.url);
+          console.log("Popup image uploaded:", data.url);
+          alert("Upload successful");
+          // Auto-select image type and apply settings so display updates immediately
+          const bgTypeEl = document.getElementById("popupBgType");
+          if (bgTypeEl) {
+            bgTypeEl.value = "image";
+            this.togglePopupBackground();
+          }
+          try {
+            this.applyVictoryPopupSettings();
+          } catch (e) {
+            console.warn("Failed to auto-apply popup settings:", e);
+          }
+        } else {
+          console.error("Upload failed", data);
+          throw new Error(data && data.error ? data.error : "Upload failed");
+        }
+      } catch (err) {
+        // Fallback: save Data-URL in localStorage so the display can use it
+        console.warn(
+          "Upload error or server unavailable, falling back to local Data-URL:",
+          err,
+        );
+        try {
+          localStorage.setItem("victoryPopupBackgroundImageUrl", imageData);
+          alert(
+            "Upload failed or server unavailable. Image saved locally (Data-URL) and will be used for popup when control and display are on the same machine.",
+          );
+          console.log("Popup image saved as data-URL in localStorage");
+
+          // Auto-select image type and apply settings so display updates immediately
+          const bgTypeEl = document.getElementById("popupBgType");
+          if (bgTypeEl) {
+            bgTypeEl.value = "image";
+            this.togglePopupBackground();
+          }
+          try {
+            this.applyVictoryPopupSettings();
+          } catch (e) {
+            console.warn("Failed to auto-apply popup settings (fallback):", e);
+          }
+        } catch (storageErr) {
+          console.error("Failed to save image to localStorage:", storageErr);
+          alert(
+            "Failed to upload and couldn't save locally: " + storageErr.message,
+          );
+        }
+      }
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  applyVictoryPopupSettings() {
+    const bgType = document.getElementById("popupBgType")?.value || "default";
+    const bgColor = document.getElementById("popupBgColor")?.value || "#1a1a2e";
+    const bgImageUrl =
+      localStorage.getItem("victoryPopupBackgroundImageUrl") ||
+      "static/popup.png";
+    localStorage.setItem("victoryPopupBackgroundType", bgType);
+    localStorage.setItem("victoryPopupBackgroundColor", bgColor);
+    localStorage.setItem("victoryPopupBackgroundImageUrl", bgImageUrl);
+    const data = { type: bgType, color: bgColor, image: bgImageUrl };
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "UPDATE_VICTORY_POPUP_SETTINGS",
+        data,
+      });
+      console.log("Victory popup settings sent to display:", data);
+    }
+    if (this.isDisplayMode) {
+      this.applyVictoryPopupBackgroundToDisplay(data);
+    }
+    alert("✓ Popup background settings updated!");
+  }
+
+  applyVictoryPopupBackgroundToDisplay(data) {
+    const applyToEl = (el) => {
+      if (!el) return;
+      el.classList.remove("custom-background");
+      if (data.type === "default") {
+        el.style.removeProperty("background");
+        el.style.removeProperty("background-image");
+        el.style.removeProperty("background-size");
+        el.style.removeProperty("background-position");
+        el.style.removeProperty("background-repeat");
+        el.style.removeProperty("background-color");
+        el.classList.remove("custom-background");
+      } else if (data.type === "color") {
+        el.style.setProperty("background", data.color, "important");
+        el.style.removeProperty("background-image");
+        el.classList.add("custom-background");
+      } else if (data.type === "image" && data.image) {
+        el.style.setProperty(
+          "background-image",
+          `url(${data.image})`,
+          "important",
+        );
+        el.style.setProperty("background-size", "cover", "important");
+        el.style.setProperty("background-position", "center", "important");
+        el.style.setProperty("background-repeat", "no-repeat", "important");
+        el.style.setProperty("background-color", "transparent", "important");
+        el.classList.add("custom-background");
+      }
+    };
+    applyToEl(document.getElementById("victoryPopup"));
+    applyToEl(document.getElementById("topNVictoryPopup"));
+    console.log("Applied victory popup background:", data);
+  }
+
+  resetVictoryPopupSettings() {
+    document.getElementById("popupBgType").value = "default";
+    document.getElementById("popupBgColor").value = "#1a1a2e";
+    localStorage.removeItem("victoryPopupBackgroundType");
+    localStorage.removeItem("victoryPopupBackgroundColor");
+    localStorage.removeItem("victoryPopupBackgroundImageUrl");
+    const vp = document.getElementById("victoryPopup");
+    const topn = document.getElementById("topNVictoryPopup");
+    [vp, topn].forEach((el) => {
+      if (el) {
+        el.style.removeProperty("background");
+        el.style.removeProperty("background-image");
+        el.style.removeProperty("background-size");
+        el.style.removeProperty("background-position");
+        el.style.removeProperty("background-repeat");
+        el.style.removeProperty("background-color");
+        el.classList.remove("custom-background");
+      }
+    });
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "UPDATE_VICTORY_POPUP_SETTINGS",
+        data: { type: "default" },
+      });
+      console.log("Victory popup reset sent to display");
+    }
+    this.togglePopupBackground();
+    alert("✓ Popup settings reset to default!");
+  }
+
+  loadVictoryPopupSettings() {
+    const savedType =
+      localStorage.getItem("victoryPopupBackgroundType") || "default";
+    const savedColor =
+      localStorage.getItem("victoryPopupBackgroundColor") || "#1a1a2e";
+    const savedImage =
+      localStorage.getItem("victoryPopupBackgroundImageUrl") ||
+      "static/popup.png";
+    const bgTypeEl = document.getElementById("popupBgType");
+    const bgColorEl = document.getElementById("popupBgColor");
+    if (bgTypeEl) {
+      bgTypeEl.value = savedType;
+      this.togglePopupBackground();
+    }
+    if (bgColorEl) {
+      bgColorEl.value = savedColor;
+    }
+    if (this.isDisplayMode) {
+      this.applyVictoryPopupBackgroundToDisplay({
+        type: savedType,
+        color: savedColor,
+        image: savedImage,
+      });
+    }
+    console.log("Victory popup settings loaded:", {
+      savedType,
+      savedColor,
+      savedImage,
+    });
+  }
+
   loadStats() {
     const saved = localStorage.getItem("duckRaceStats");
     if (saved) {
