@@ -3233,9 +3233,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   }
 
   async detectAllFilesInFolder(folderName) {
-    // Mỗi folder có 5 file webp: compressed_frame_1.webp đến compressed_frame_5.webp
+    // Mỗi folder có 3 file webp: compressed_frame_1.webp đến compressed_frame_3.webp
     const files = [];
-    const totalFrames = 5;
+    const totalFrames = 3;
 
     for (let num = 1; num <= totalFrames; num++) {
       const fileName = `compressed_frame_${num}.webp`;
@@ -3248,7 +3248,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       }
     }
 
-    console.log(`Folder ${folderName}: Found ${files.length}/5 frames`);
+    console.log(`Folder ${folderName}: Found ${files.length}/3 frames`);
     return files;
   }
 
