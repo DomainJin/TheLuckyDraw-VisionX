@@ -1027,6 +1027,7 @@ h1 {
     0 15px 40px rgba(0, 0, 0, 0.4),
     inset 0 0 50px rgba(0, 0, 0, 0.3),
     0 0 50px rgba(102, 126, 234, 0.3);
+  /* Keep track clipped to its rounded box so visuals don't escape outer bounds (but ducks can overlap banks via z-index) */
   overflow: hidden;
   border: 3px solid rgba(255, 255, 255, 0.1);
   margin: 0 auto;
@@ -1042,8 +1043,9 @@ h1 {
   background-repeat: repeat-x;
   background-size: auto 100%;
   background-position: 0 0;
-  /* Place bank-top behind the river to respect perspective (near/far): */
-  z-index: 1; /* low z-index so river and ducks appear above */
+  /* Ensure bank-top is always behind duck icons and canvas ducks */
+  z-index: 0; /* keep lower than .race-river (50) and .duck-element (60) */
+  pointer-events: none; /* don't block interactions */
 }
 
 .race-river {
@@ -1098,6 +1100,7 @@ h1 {
   position: absolute;
   top: 15%; /* match race-river */
   left: 0;
+  overflow: visible; /* allow duck visuals to overflow beyond lane bounds */
   width: 100%;
   height: 70%;
   z-index: 60; /* above river (50) and finish line (55) */
@@ -1283,15 +1286,18 @@ h1 {
   filter: none;
   opacity: 1;
   /* Ducks should appear above the river and finish-line visuals */
-  z-index: 60;
+  z-index: 1000 !important; /* ensure ducks never get occluded by decorative banks */
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible; /* allow image visuals to overflow container */
 }
 
 .duck-icon {
-  width: 10%;
-  height: 10%;
+  width: auto;
+  height: auto;
+  max-width: 10%;
+  max-height: 10%;
   object-fit: contain;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5)) brightness(1.1)
     contrast(1.1);
@@ -2342,14 +2348,23 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 5px 0;
+  margin: 2px 0 4px 0; /* reduced gap between icon and prize name */
+  /* Crop bottom 40% of icon: keep top 60% visible */
+  overflow: hidden;
+  position: relative;
 }
 
 .winner-icon-display img {
-  max-width: 100%;
-  max-height: 100%;
+  /* Scale the image so that its top 60% fills the container,
+     effectively cropping the bottom 40% */
+  height: 166.66667%; /* 100 / 0.6 = 166.6667% */
+  width: auto;
+  display: block;
+  margin: 0 auto; /* center horizontally */
   object-fit: contain;
+  object-position: top center; /* ensure top part is shown */
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  max-width: none;
 }
 
 .winner-position {
@@ -2519,18 +2534,18 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start; /* align items from top so height matches content */
   gap: 0.5em;
-  flex: 1 1 0;
+  flex: 0 1 auto; /* allow width to flex but don't force equal heights */
   min-width: 6%;
   max-width: 10%;
-  aspect-ratio: 1 / 1.2;
   box-sizing: border-box;
 }
 
 .topn-winner-card:hover {
-  transform: translateY(-5px) scale(1.05);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  /* Remove scale to avoid scaling shadow when icon/card size changes */
+  transform: translateY(-5px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
 }
 
 .topn-winner-medal {
@@ -2573,7 +2588,7 @@ h1 {
 .topn-winner-name {
   font-size: clamp(0.6em, 1vw, 1em);
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
   margin: 0.3em 0;
   word-break: break-word;
   line-height: 1.2;

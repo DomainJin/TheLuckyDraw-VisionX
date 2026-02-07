@@ -405,7 +405,7 @@
       .victory-header {
         flex-shrink: 0 !important;
         margin: 0 !important;
-        padding: 0 !important;
+        padding: -5% !important;
         text-align: center !important;
         width: 100% !important;
       }
@@ -433,7 +433,7 @@
         transform: translateY(-5%) !important;
       }
 
-      /* Winner icon - compact */
+      /* Winner icon - compact (crop 20% top/bottom by using oversized image and overflow hidden) */
       .winner-icon {
         width: 45% !important;
         height: 45% !important;
@@ -442,6 +442,51 @@
         margin: 0 auto 2% !important;
         flex-shrink: 0 !important;
         animation: winnerSpin 2s ease-in-out infinite !important;
+        overflow: visible !important; /* allow card pseudo to extend for name */
+        position: relative !important;
+        z-index: 2 !important;
+      }
+
+      /* Create unified rounded card behind icon and extend down to include winner name */
+      .winner-icon::before {
+        content: "";
+        position: absolute !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        top: 0 !important;
+        left: 50% !important;
+        right: 50% !important;
+        width: 110% !important; /* slightly wider to provide padding */
+        /* use bottom instead of fixed height so it adapts to font size */
+        bottom: -3.25rem !important; /* extend below to include name */
+        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+        box-shadow: 0 28px 84px rgba(102, 126, 234, 0.34) !important;
+        z-index: 1 !important;
+        pointer-events: none !important;
+      }
+
+      .winner-icon img {
+        /* Increase oversize to crop more vertically (approx 20% -> ~40% total crop) */
+        height: 180% !important;
+        width: auto !important;
+        object-fit: cover !important;
+        object-position: center center !important;
+        display: block !important;
+        margin: 0 auto !important;
+        transform: translateY(0%); /* keep centered */
+        position: relative !important;
+        z-index: 3 !important;
+        border: none !important; /* remove any accidental borders */
+        box-shadow: none !important;
+      }
+
+      .winner-name {
+        position: relative !important;
+        z-index: 4 !important; /* keep name above pseudo background */
+        margin-top: 6px !important;
+        background: transparent !important; /* ensure no child background */
+        padding: 0 !important;
       }
 
       .winner-name {
@@ -475,11 +520,13 @@
 
       /* Top N Victory Popup - Display Mode Styles */
       .victory-content-topn {
+        position: relative !important;
         width: 95% !important;
         height: 90% !important;
         aspect-ratio: auto !important;
         border-radius: 0 !important;
-        padding: 1.5% !important;
+        /* Leave extra top padding so absolutely-positioned header doesn't overlap content */
+        padding: 3.5% 1.5% 1.5% 1.5% !important;
         /* Loại bỏ nền cam/oval và background image */
         background: transparent !important;
         background-image: none !important;
@@ -497,14 +544,26 @@
         overflow: hidden !important;
       }
 
+      /* Make header float above content */
       .victory-content-topn .victory-header {
-        flex-shrink: 0 !important;
-        margin-bottom: 0.5% !important;
+        position: absolute !important;
+        top: 10px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 10 !important;
+        width: auto !important;
+        background: transparent !important; /* background removed */
+        padding: 6px 12px !important;
+        border-radius: 8px !important;
+        pointer-events: none !important;
       }
 
       .victory-content-topn .victory-header h1 {
         font-size: clamp(1.2em, 2vw, 1.8em) !important;
         margin: 0 !important;
+        color: #ffffff !important;
+        text-align: center !important;
+        line-height: 1 !important;
       }
 
       .victory-body-topn {
@@ -517,71 +576,285 @@
         flex-direction: row !important;
         flex-wrap: wrap !important;
         justify-content: center !important;
-        align-items: center !important;
+        /* Allow cards to stretch to the row height so they can be vertically centered internally */
+        align-items: stretch !important;
+        /* Center rows within the grid when there's extra vertical space */
         align-content: center !important;
         gap: 1% !important;
-        overflow: hidden !important;
+        overflow: visible !important; /* allow names to show if they extend slightly */
       }
 
       @keyframes winnerPulse {
+        /* No scaling - animate vertical lift only (pseudo-element handles glow) */
         0% {
-          transform: translateY(-5px) scale(1.05);
-          box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+          transform: translateY(-5px);
         }
         50% {
-          transform: translateY(-7px) scale(1.08);
-          box-shadow: 0 15px 40px rgba(157, 218, 59, 0.7);
+          transform: translateY(-7px);
         }
         100% {
-          transform: translateY(-5px) scale(1.05);
-          box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+          transform: translateY(-5px);
+        }
+      }
+
+      @keyframes winnerGlow {
+        0% {
+          box-shadow: 0 20px 60px rgba(102, 126, 234, 0.5);
+        }
+        50% {
+          box-shadow: 0 60px 180px rgba(255, 215, 64, 0.85);
+        }
+        100% {
+          box-shadow: 0 20px 60px rgba(102, 126, 234, 0.5);
         }
       }
 
       .topn-winner-card {
-        background: transparent !important;
-        /* border-radius: 12px !important; */
+        position: relative !important; /* allow pseudo-element glow */
+        /* unified card background so it covers icon + prize + code + name */
+        background: rgba(255, 255, 255, 0.03) !important;
+        border-radius: 8px !important;
         width: auto !important;
         max-width: none !important; /* no fixed max */
         min-width: 100px !important; /* keep a minimum for layout */
-        padding: 10px 14px !important;
+        padding: 6px 12px 18px 12px !important; /* extra bottom padding so text is inside */
+        box-sizing: border-box !important;
 
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
-        justify-content: center !important;
-        gap: 0.3em !important;
+        justify-content: flex-start !important;
+        gap: 4px !important; /* tighter spacing */
         flex: 0 0 auto !important;
 
-        /* Scale top-N winner card by race-track height */
-        height: calc(
-          (100vw * var(--track-h) / var(--track-w)) * 0.65
-        ) !important;
+        /* Let card fill the available row height so content can be vertically centered */
+        height: 100% !important;
+        min-height: 0 !important;
         max-height: calc(
-          (100vw * var(--track-h) / var(--track-w)) * 0.9
+          (100vw * var(--track-h) / var(--track-w)) * 0.95
         ) !important;
-        min-height: 120px !important;
 
-        /* Hiệu ứng nhấp nháy */
-        animation: winnerPulse 1.5s ease-in-out infinite;
+        overflow: visible !important; /* ensure children are visible inside card */
+
+        /* Vertically center card contents */
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+
+        /* Hiệu ứng nhấp nháy (kept) */
+        animation: winnerPulse 1.5s ease-in-out infinite !important;
       }
 
-      .topn-winner-medal {
-        font-size: clamp(1em, 3vw, 3em) !important;
-        margin: 0.1em 0 !important;
-        line-height: 1 !important;
-        animation: winnerSpin 2s ease-in-out infinite !important;
-        flex-shrink: 0 !important;
+      /* Glow pseudo-element sits behind the card and will be animated.
+         Extend bottom inset so glow and fill include the text area */
+      .topn-winner-card::before {
+        content: "";
+        position: absolute !important;
+        /* extend bottom extra to ensure coverage of name - use larger negative bottom */
+        inset: 0 0 -40px 0 !important;
+        border-radius: 8px !important;
+        background: rgba(
+          255,
+          255,
+          255,
+          0.08
+        ) !important; /* stronger subtle fill to brighten card */
+        box-shadow: 0 40px 140px rgba(102, 126, 234, 0.7) !important; /* brighter, larger glow */
+        z-index: 0 !important;
+        transition: box-shadow 0.25s ease !important;
+        pointer-events: none !important;
+        /* stronger glow + pulsating pulse (use !important on whole property) */
+        animation:
+          winnerGlow 1.5s ease-in-out infinite,
+          topnBeforePulse 2s ease-in-out infinite !important;
+      }
+
+      /* Soft pulsing overlay (on top of glow) to create a background flash effect */
+      .topn-winner-card::after {
+        content: "";
+        position: absolute !important;
+        /* inset a bit so the flash sits inside the rounded card */
+        inset: 6px 8px -36px 8px !important;
+        border-radius: 6px !important;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.06),
+          rgba(255, 255, 255, 0)
+        ) !important; /* stronger mid-tone flash */
+        opacity: 0 !important;
+        z-index: 0 !important; /* keep overlay behind content */
+        pointer-events: none !important;
+        animation: topnBgPulse 1.6s ease-in-out infinite !important;
+      }
+
+      /* Emulate hover state continuously by animating the card transform, and pause when actually hovered */
+      .topn-winner-card {
+        /* Smoother, slightly slower pulse with GPU compositing hints for smoother rendering */
+        animation: topnHoverPulse 1.8s cubic-bezier(0.22, 0.9, 0.25, 1) infinite !important;
+        animation-fill-mode: both !important;
+        will-change: transform, box-shadow !important;
+        transform-origin: center bottom !important;
+        backface-visibility: hidden !important;
+        transform: translateZ(0) !important; /* promote to composite layer */
+      }
+
+      .topn-winner-card:hover {
+        /* stop auto-animation so real hover feels immediate */
+        animation-play-state: paused !important;
+      }
+
+      /* Hover pause on pseudo-element removed so auto animations continue */
+      .topn-winner-card:hover::before {
+        /* no-op */
+      }
+
+      @keyframes topnBeforePulse {
+        0% {
+          box-shadow: 0 18px 54px rgba(102, 126, 234, 0.36);
+          transform: translateY(0);
+          opacity: 0.3;
+        }
+        30% {
+          box-shadow: 0 36px 100px rgba(102, 126, 234, 0.6);
+          transform: translateY(-6px);
+          opacity: 0.8;
+        }
+        55% {
+          box-shadow: 0 60px 180px rgba(102, 126, 234, 0.9);
+          transform: translateY(-12px);
+          opacity: 1;
+        }
+        80% {
+          box-shadow: 0 34px 100px rgba(102, 126, 234, 0.5);
+          transform: translateY(-6px);
+          opacity: 0.7;
+        }
+        100% {
+          box-shadow: 0 18px 54px rgba(102, 126, 234, 0.36);
+          transform: translateY(0);
+          opacity: 0.3;
+        }
+      }
+
+      @keyframes topnHoverPulse {
+        0% {
+          transform: translateY(0) scale(1);
+        }
+        12.5% {
+          transform: translateY(-3px) scale(1.015);
+        }
+        25% {
+          transform: translateY(-6px) scale(1.03);
+        }
+        37.5% {
+          transform: translateY(-8px) scale(1.045);
+        }
+        50% {
+          transform: translateY(-10px) scale(1.06);
+        }
+        62.5% {
+          transform: translateY(-8px) scale(1.045);
+        }
+        75% {
+          transform: translateY(-6px) scale(1.03);
+        }
+        87.5% {
+          transform: translateY(-3px) scale(1.015);
+        }
+        100% {
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      @keyframes topnBgPulse {
+        0% {
+          opacity: 0;
+          transform: translateY(0);
+        }
+        30% {
+          opacity: 0.45;
+          transform: translateY(-2px);
+        }
+        50% {
+          opacity: 0.95;
+          transform: translateY(-6px);
+        }
+        70% {
+          opacity: 0.85;
+          transform: translateY(-3px);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(0);
+        }
+      }
+
+      /* Hover-specific box-shadow removed - auto pulse controls glow */
+      .topn-winner-card:hover::before {
+        /* no-op */
+      }
+
+      /* Ensure no child has its own background/border/box-shadow that breaks the single-card look */
+      .topn-winner-card .topn-winner-icon,
+      .topn-winner-card .topn-winner-icon img,
+      .topn-winner-card .topn-winner-position,
+      .topn-winner-card .topn-winner-code,
+      .topn-winner-card .topn-winner-name,
+      .topn-winner-card .topn-winner-medal {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+      }
+
+      /* Keep children above the pseudo background */
+      .topn-winner-card > * {
+        position: relative !important;
+        z-index: 2 !important;
+      }
+
+      /* Remove any residual backgrounds/borders/shadows from elements inside victory popups
+         so only the main unified card/pseudo-element draws the background */
+      #victoryPopup *,
+      #topNVictoryPopup * {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+      }
+
+      /* Additionally remove borders/shadows from .winner-card specifically inside popups
+         (some global styles set borders on .winner-card in style.css) */
+      #victoryPopup .winner-card,
+      #victoryPopup .winner-card::before,
+      #victoryPopup .winner-card::after,
+      #topNVictoryPopup .winner-card,
+      #topNVictoryPopup .winner-card::before,
+      #topNVictoryPopup .winner-card::after {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        outline: none !important;
+      }
+
+      /* Re-enable specific visuals we still want: keep name and medal text color and positioning */
+      #victoryPopup .winner-name,
+      #topNVictoryPopup .topn-winner-name {
+        font-size: clamp(3em) !important;
+        color: #ffffff !important;
+        text-shadow: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+      }
+
+      /* Ensure children sit inside the card stacking/context for shadow */
+      .topn-winner-card > * {
+        position: relative !important;
+        z-index: 3 !important; /* above overlay and glow */
       }
 
       .topn-winner-icon {
-        /* Scale icon relative to race-track height to keep consistent size */
-        width: calc(
-          (100vw * var(--track-h) / var(--track-w)) * 0.45
-        ) !important;
-        height: calc(
-          (100vw * var(--track-h) / var(--track-w)) * 0.45
-        ) !important;
         margin: 0.2em 0 !important;
         display: flex !important;
         align-items: center !important;
@@ -590,45 +863,47 @@
       }
 
       .topn-winner-icon img {
-        max-width: 100% !important;
-        max-height: 100% !important;
+        max-width: 200% !important;
+        max-height: 200% !important;
         object-fit: contain !important;
         filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.3)) !important;
       }
-
       .topn-winner-position {
         font-size: clamp(1em, 1vw, 1em) !important;
         font-weight: bold !important;
         color: #82dd0b !important;
-        margin: 0.2em 0 !important;
+        margin: 0 !important; /* remove extra margins */
+        padding: 0 !important;
         text-align: center !important;
 
         white-space: normal !important;
         overflow-wrap: break-word !important;
         word-break: break-word !important;
 
-        max-width: 140px !important; /* ép khung hẹp lại để text xuống hàng */
-        line-height: 1.2 !important;
+        max-width: 140px !important; /* keep narrow width for wrapping */
+        line-height: 1.1 !important; /* tighter line height */
       }
 
       .topn-winner-code {
-        font-size: clamp(1em, 1vw, 3em) !important;
+        font-size: clamp(1em, 1vw, 1.5em) !important;
         font-weight: 700 !important;
         color: #ffd700 !important;
-        margin: 0.15em 0 !important;
+        margin: 0 !important; /* tighten spacing */
+        padding: 0 !important;
         text-align: center !important;
         white-space: nowrap !important;
         overflow: visible !important;
         text-overflow: clip !important;
-        line-height: 1.2 !important;
+        line-height: 1.1 !important;
         text-shadow: 0 3px 6px rgba(0, 0, 0, 0.3) !important;
       }
 
       .topn-winner-name {
         font-size: clamp(1em, 1vw, 3em) !important;
         font-weight: 600 !important;
-        color: #ffffff !important;
-        margin: 0.2em 0 !important;
+        color: #222222 !important; /* dark text for white background */
+        margin: 0 !important; /* tighten spacing */
+        padding: 0 !important;
         text-align: center !important;
 
         /* Không xuống hàng */
@@ -636,7 +911,7 @@
         overflow: visible !important;
         text-overflow: clip !important;
 
-        line-height: 1.3 !important;
+        line-height: 1.1 !important; /* tighter line height */
         max-width: 100% !important;
       }
 
@@ -726,7 +1001,7 @@
       <div class="victory-overlay"></div>
       <div class="victory-content">
         <div class="victory-body">
-          <div class="winner-icon" id="winnerIcon"></div>
+          <div class="winner-icon --crop-bottom: 20%;" id="winnerIcon"></div>
           <h2 class="winner-name" id="winnerName">Winner Name</h2>
           <div class="winner-stats" id="winnerStats"></div>
         </div>
@@ -942,7 +1217,12 @@
             case "UPDATE_DUCK_SIZE":
               if (displayGame) {
                 console.log("🦆 UPDATE_DUCK_SIZE received in display:", data);
-                displayGame.duckSizeRatio = data.duckSizeRatio;
+                if (typeof data.duckSizeRatio !== "undefined") {
+                  displayGame.duckSizeRatio = data.duckSizeRatio;
+                }
+                if (typeof data.duckScale !== "undefined") {
+                  displayGame.duckScale = data.duckScale;
+                }
                 // If you have a method to force redraw, call it here:
                 if (
                   typeof displayGame.updateDuckPositionsCanvas === "function"
@@ -1055,6 +1335,17 @@
             case "REQUEST_ICONS_STATUS":
               // Control is requesting icon status - reply immediately
               console.log("📨 Control requesting icon status, replying...");
+
+              // Always acknowledge that display is open so control can mark it ready
+              try {
+                displayChannel.postMessage({ type: "DISPLAY_READY" });
+                console.log(
+                  "📤 Sent DISPLAY_READY acknowledgement to control (in response to REQUEST_ICONS_STATUS)",
+                );
+              } catch (e) {
+                console.warn("Failed to send DISPLAY_READY reply:", e);
+              }
+
               if (
                 displayGame &&
                 displayGame.imagesLoaded &&
@@ -1145,6 +1436,7 @@
           duckImages,
           startTime,
           currentScriptPrizeName,
+          minDisplayLanes,
         } = data;
 
         console.log("🎮 Display: startRaceWithData called with:", {
@@ -1189,6 +1481,20 @@
           console.error("Display: loadingDisplay element not found!");
         }
 
+        // Apply minDisplayLanes from control if provided
+        if (typeof minDisplayLanes !== "undefined" && displayGame) {
+          try {
+            if (typeof displayGame.setMinDisplayLanes === "function") {
+              displayGame.setMinDisplayLanes(minDisplayLanes);
+            } else {
+              displayGame.minDisplayLanes = minDisplayLanes;
+            }
+            console.log("Display: Applied minDisplayLanes:", minDisplayLanes);
+          } catch (e) {
+            console.warn("Display: Failed to apply minDisplayLanes:", e);
+          }
+        }
+
         // Show race elements (only big timer and race track on display)
         const bigTimer = document.getElementById("bigTimer");
         if (bigTimer) {
@@ -1218,6 +1524,11 @@
         displayGame.winners = []; // Reset winners array
         displayGame.currentTheme = theme;
         displayGame.currentScriptPrizeName = currentScriptPrizeName; // Set prize name from script
+        // Apply sizing if provided by control
+        if (typeof data.duckSizeRatio !== "undefined")
+          displayGame.duckSizeRatio = data.duckSizeRatio;
+        if (typeof data.duckScale !== "undefined")
+          displayGame.duckScale = data.duckScale;
         if (duckNames && duckNames.length > 0) {
           displayGame.activeDuckNames = duckNames;
           displayGame.duckNames = duckNames; // Also set duckNames for reference
@@ -1729,167 +2040,120 @@
       }
 
       // Load saved settings on page load
-      window.addEventListener("load", () => {
-        // Load display background settings
-        const savedType = localStorage.getItem("displayBackgroundType");
-        if (savedType && savedType !== "default") {
-          const savedColor = localStorage.getItem("displayBackgroundColor");
-          const savedImage = localStorage.getItem("displayBackgroundImage");
-
-          handleUpdateDisplaySettings({
-            type: savedType,
-            color: savedColor,
-            image: savedImage,
-          });
-
-          console.log("✓ Loaded saved display settings from localStorage");
-        }
-
-        // Load result panel background settings
-        const resultPanelType = localStorage.getItem(
-          "resultPanelBackgroundType",
-        );
-        if (resultPanelType && resultPanelType !== "default") {
-          const resultPanelColor = localStorage.getItem(
-            "resultPanelBackgroundColor",
-          );
-          const resultPanelImage = localStorage.getItem(
-            "resultPanelBackgroundImage",
-          );
-
-          handleUpdateResultPanelSettings({
-            type: resultPanelType,
-            color: resultPanelColor,
-            image: resultPanelImage,
-          });
-
-          console.log("✓ Loaded saved result panel settings from localStorage");
-        }
-
-        function handleUpdateVictoryPopupSettings(data) {
-          console.log("🎨 Applying victory popup settings on display:", data);
-          const applyTo = (el) => {
-            if (!el) return;
-            if (data.type === "default") {
-              // Reset CSS variables and inline background properties
-              el.style.removeProperty("--victory-popup-bg");
-              el.style.removeProperty("--victory-popup-repeat");
-              el.style.removeProperty("--victory-popup-size");
-              el.style.removeProperty("--victory-popup-position");
-              el.style.removeProperty("--victory-popup-color");
-              el.style.removeProperty("background");
-              el.style.removeProperty("background-image");
-              el.classList.remove("custom-background");
-              console.log("✓ Popup background reset to default (vars cleared)");
-            } else {
-              el.classList.add("custom-background");
-              if (data.type === "color") {
-                // Use CSS variable for color to avoid being overridden by stylesheet
-                el.style.setProperty(
-                  "--victory-popup-color",
-                  data.color,
-                  "important",
-                );
-                // Ensure any background image is disabled
-                el.style.setProperty("--victory-popup-bg", "none", "important");
-                el.style.setProperty(
-                  "--victory-popup-repeat",
-                  "no-repeat",
-                  "important",
-                );
-                el.style.setProperty(
-                  "--victory-popup-size",
-                  "auto",
-                  "important",
-                );
-                el.style.setProperty(
-                  "--victory-popup-position",
-                  "center",
-                  "important",
-                );
-                console.log(
-                  "✓ Popup color applied (via CSS variable):",
-                  data.color,
-                );
-              } else if (data.type === "image" && data.image) {
-                // Set variables so CSS picks them up even when stylesheet has !important
-                el.style.setProperty(
-                  "--victory-popup-bg",
-                  `url(${data.image})`,
-                  "important",
-                );
-                el.style.setProperty(
-                  "--victory-popup-size",
-                  "cover",
-                  "important",
-                );
-                el.style.setProperty(
-                  "--victory-popup-position",
-                  "center",
-                  "important",
-                );
-                el.style.setProperty(
-                  "--victory-popup-repeat",
-                  "no-repeat",
-                  "important",
-                );
-                el.style.setProperty(
-                  "--victory-popup-color",
-                  "transparent",
-                  "important",
-                );
-                console.log("✓ Popup image applied (via CSS variable)");
-              }
-            }
-            if (data.type)
-              localStorage.setItem("victoryPopupBackgroundType", data.type);
-            if (data.color)
-              localStorage.setItem("victoryPopupBackgroundColor", data.color);
-            if (data.image)
-              localStorage.setItem(
-                "victoryPopupBackgroundImageUrl",
-                data.image,
+      function handleUpdateVictoryPopupSettings(data) {
+        console.log("🎨 Applying victory popup settings on display:", data);
+        const applyTo = (el) => {
+          if (!el) return;
+          if (data.type === "default") {
+            // Reset CSS variables and inline background properties
+            el.style.removeProperty("--victory-popup-bg");
+            el.style.removeProperty("--victory-popup-repeat");
+            el.style.removeProperty("--victory-popup-size");
+            el.style.removeProperty("--victory-popup-position");
+            el.style.removeProperty("--victory-popup-color");
+            el.style.removeProperty("background");
+            el.style.removeProperty("background-image");
+            el.classList.remove("custom-background");
+            console.log("✓ Popup background reset to default (vars cleared)");
+          } else {
+            el.classList.add("custom-background");
+            if (data.type === "color") {
+              // Use CSS variable for color to avoid being overridden by stylesheet
+              el.style.setProperty(
+                "--victory-popup-color",
+                data.color,
+                "important",
               );
-          };
-          applyTo(document.getElementById("victoryPopup"));
-          applyTo(document.getElementById("topNVictoryPopup"));
-        }
+              // Ensure any background image is disabled
+              el.style.setProperty("--victory-popup-bg", "none", "important");
+              el.style.setProperty(
+                "--victory-popup-repeat",
+                "no-repeat",
+                "important",
+              );
+              el.style.setProperty("--victory-popup-size", "auto", "important");
+              el.style.setProperty(
+                "--victory-popup-position",
+                "center",
+                "important",
+              );
+              console.log(
+                "✓ Popup color applied (via CSS variable):",
+                data.color,
+              );
+            } else if (data.type === "image" && data.image) {
+              // Set variables so CSS picks them up even when stylesheet has !important
+              el.style.setProperty(
+                "--victory-popup-bg",
+                `url(${data.image})`,
+                "important",
+              );
+              el.style.setProperty(
+                "--victory-popup-size",
+                "cover",
+                "important",
+              );
+              el.style.setProperty(
+                "--victory-popup-position",
+                "center",
+                "important",
+              );
+              el.style.setProperty(
+                "--victory-popup-repeat",
+                "no-repeat",
+                "important",
+              );
+              el.style.setProperty(
+                "--victory-popup-color",
+                "transparent",
+                "important",
+              );
+              console.log("✓ Popup image applied (via CSS variable)");
+            }
+          }
+          if (data.type)
+            localStorage.setItem("victoryPopupBackgroundType", data.type);
+          if (data.color)
+            localStorage.setItem("victoryPopupBackgroundColor", data.color);
+          if (data.image)
+            localStorage.setItem("victoryPopupBackgroundImageUrl", data.image);
+        };
+        applyTo(document.getElementById("victoryPopup"));
+        applyTo(document.getElementById("topNVictoryPopup"));
+      }
 
-        // Load victory popup settings (if any)
-        const victoryPopupType = localStorage.getItem(
-          "victoryPopupBackgroundType",
+      // Load victory popup settings (if any)
+      const victoryPopupType = localStorage.getItem(
+        "victoryPopupBackgroundType",
+      );
+      if (victoryPopupType && victoryPopupType !== "default") {
+        const victoryPopupColor = localStorage.getItem(
+          "victoryPopupBackgroundColor",
         );
-        if (victoryPopupType && victoryPopupType !== "default") {
-          const victoryPopupColor = localStorage.getItem(
-            "victoryPopupBackgroundColor",
-          );
-          const victoryPopupImage = localStorage.getItem(
-            "victoryPopupBackgroundImageUrl",
-          );
-          handleUpdateVictoryPopupSettings({
-            type: victoryPopupType,
-            color: victoryPopupColor,
-            image: victoryPopupImage,
-          });
-          console.log(
-            "✓ Loaded saved victory popup settings from localStorage",
-          );
-        }
+        const victoryPopupImage = localStorage.getItem(
+          "victoryPopupBackgroundImageUrl",
+        );
+        handleUpdateVictoryPopupSettings({
+          type: victoryPopupType,
+          color: victoryPopupColor,
+          image: victoryPopupImage,
+        });
+        console.log("✓ Loaded saved victory popup settings from localStorage");
+      }
 
-        // Load race track aspect ratio settings
-        const savedTrackWidth = localStorage.getItem("raceTrackWidth");
-        const savedTrackHeight = localStorage.getItem("raceTrackHeight");
-        if (savedTrackWidth && savedTrackHeight && displayGame) {
-          displayGame.applyRaceTrackAspectRatio(
-            savedTrackWidth,
-            savedTrackHeight,
-          );
-          console.log(
-            "✓ Loaded saved race track aspect ratio:",
-            `${savedTrackWidth}:${savedTrackHeight}`,
-          );
-        }
-      });
+      // Load race track aspect ratio settings
+      const savedTrackWidth = localStorage.getItem("raceTrackWidth");
+      const savedTrackHeight = localStorage.getItem("raceTrackHeight");
+      if (savedTrackWidth && savedTrackHeight && displayGame) {
+        displayGame.applyRaceTrackAspectRatio(
+          savedTrackWidth,
+          savedTrackHeight,
+        );
+        console.log(
+          "✓ Loaded saved race track aspect ratio:",
+          `${savedTrackWidth}:${savedTrackHeight}`,
+        );
+      }
 
       // Butterfly cursor animation with smooth movement
       function initButterflyCursor() {

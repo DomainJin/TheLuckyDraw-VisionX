@@ -700,24 +700,44 @@ class Game {
   }
   // Force update all duck sizes (live update)
   forceUpdateDuckSize() {
-    const duckHeight = this.trackHeight * this.duckSizeRatio;
+    const baseDuckHeight = this.trackHeight * this.duckSizeRatio;
+    const duckHeight = Math.round(baseDuckHeight * (this.duckScale || 1));
     for (const [id, duckEl] of this.duckElements.entries()) {
       duckEl.style.width = `${duckHeight}px`;
       duckEl.style.height = `${duckHeight}px`;
       const img = duckEl.querySelector(".duck-icon");
       if (img) {
-        img.style.width = `${duckHeight}px`;
-        img.style.height = `${duckHeight}px`;
+        // Thay vì set width/height bằng nhau (gây bóp méo), set height 100% và width auto để giữ tỷ lệ gốc
+        // object-fit: contain trong CSS sẽ đảm bảo ảnh fit vào container vuông mà không bị crop hoặc stretch
+        img.style.width = "auto";
+        img.style.height = "100%";
       }
     }
-    console.log("[DuckSize] forceUpdateDuckSize:", duckHeight);
+    console.log(
+      "[DuckSize] forceUpdateDuckSize:",
+      duckHeight,
+      "(base:",
+      Math.round(this.trackHeight * this.duckSizeRatio),
+      ", scale:",
+      this.duckScale,
+      ")",
+    );
   }
   constructor(isDisplayMode = false) {
     // Set display mode FIRST before any other initialization
     this.isDisplayMode = isDisplayMode;
 
+    // Instance counter for debugging concurrent instances
+    if (typeof Game._instanceCounter === "undefined") Game._instanceCounter = 0;
+    this._instanceId = ++Game._instanceCounter;
+    console.log(
+      `Game instance created: id=${this._instanceId}, isDisplayMode=${this.isDisplayMode}`,
+    );
+
     this.ducks = [];
     this.duckCount = 300;
+    // Minimum number of visible lanes (user requested at least 10 lanes)
+    this.minDisplayLanes = 10;
     this.raceDuration = 30;
     this.gameSpeed = 1.0; // Game speed multiplier: 0.25x to 3x
     this.raceMode = "topN"; // Always use topN mode with variable winner count
@@ -865,6 +885,62 @@ class Game {
             }
           });
         }
+
+        // Duck scale slider control (realtime)
+        const duckScaleEl = document.getElementById("duckScale");
+        const duckScaleValueEl = document.getElementById("duckScaleValue");
+        if (duckScaleEl) {
+          // Initialize slider to current value
+          duckScaleEl.value = Math.round((this.duckScale || 1) * 100);
+          if (duckScaleValueEl)
+            duckScaleValueEl.textContent = duckScaleEl.value + "%";
+
+          duckScaleEl.addEventListener("input", (e) => {
+            const v = parseInt(e.target.value, 10) || 100;
+            this.duckScale = v / 100;
+            if (duckScaleValueEl) duckScaleValueEl.textContent = v + "%";
+            console.log("[DuckScale] updated:", this.duckScale);
+            // Persist
+            try {
+              localStorage.setItem("duckScale", String(this.duckScale));
+            } catch (err) {
+              // ignore
+            }
+
+            // Update CSS var for duck size
+            const trackElement = document.getElementById("raceTrack");
+            if (trackElement) {
+              const sizePx = Math.round(
+                this.trackHeight * this.duckSizeRatio * (this.duckScale || 1),
+              );
+              document.documentElement.style.setProperty(
+                "--duck-size",
+                `${sizePx}px`,
+              );
+            }
+
+            // Force update rendering
+            if (
+              this.useCanvasRendering &&
+              typeof this.updateDuckPositionsCanvas === "function"
+            ) {
+              this.updateDuckPositionsCanvas();
+            } else if (typeof this.forceUpdateDuckSize === "function") {
+              this.forceUpdateDuckSize();
+            }
+
+            // Notify display
+            if (this.displayChannel) {
+              this.displayChannel.postMessage({
+                type: "UPDATE_DUCK_SIZE",
+                data: {
+                  duckScale: this.duckScale,
+                  duckSizeRatio: this.duckSizeRatio,
+                },
+              });
+            }
+          });
+        }
       }, 100);
     }
 
@@ -907,6 +983,7 @@ class Game {
     this.viewportWidth = 0;
     this.trackHeight = 0;
     this.duckSizeRatio = 0.5; // global ratio: duck height = trackHeight * duckSizeRatio (default 50%)
+    this.duckScale = 0.5; // global scale multiplier for duck icons (0.1 - 1.0). Use 1.0 for original size
     this.isFullscreen = false;
 
     this.stats = this.loadStats();
@@ -946,11 +1023,23 @@ class Game {
       const data = msg.data;
       // Live update duck size from control tab
       if (type === "UPDATE_DUCK_SIZE") {
-        this.duckSizeRatio = data.duckSizeRatio;
-        console.log(
-          "[DuckSize][display] Received UPDATE_DUCK_SIZE:",
-          data.duckSizeRatio,
-        );
+        // Accept both duckSizeRatio and optional duckScale for finer control
+        if (typeof data.duckSizeRatio !== "undefined") {
+          this.duckSizeRatio = data.duckSizeRatio;
+          console.log(
+            "[DuckSize][display] Received UPDATE_DUCK_SIZE (ratio):",
+            data.duckSizeRatio,
+          );
+        }
+        if (typeof data.duckScale !== "undefined") {
+          this.duckScale = data.duckScale;
+          console.log(
+            "[DuckSize][display] Received UPDATE_DUCK_SIZE (scale):",
+            data.duckScale,
+          );
+        }
+
+        // Update rendering based on mode
         if (
           this.useCanvasRendering &&
           typeof this.updateDuckPositionsCanvas === "function"
@@ -962,6 +1051,8 @@ class Game {
         console.log(
           "[DuckSize][display] Updated duckSizeRatio:",
           this.duckSizeRatio,
+          "duckScale:",
+          this.duckScale,
         );
         return;
       }
@@ -1156,7 +1247,28 @@ class Game {
 
   // Get employee code for display
   getDisplayCode(duck) {
-    return duck.code || "";
+    // Primary: explicit code on duck object
+    if (duck && duck.code) return duck.code;
+
+    // Fallback: if we have a list of loaded duck names/codes, try to find by name
+    try {
+      if (
+        duck &&
+        duck.name &&
+        Array.isArray(this.duckNames) &&
+        Array.isArray(this.duckCodes)
+      ) {
+        const idx = this.duckNames.findIndex((n) => n === duck.name);
+        if (idx !== -1 && this.duckCodes[idx]) return this.duckCodes[idx];
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Last resort: use id as code
+    if (duck && duck.id !== undefined && duck.id !== null) return `#${duck.id}`;
+
+    return "";
   }
 
   // Get display name (without code)
@@ -2813,19 +2925,53 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     const savedDuckRatio = parseFloat(localStorage.getItem("duckSizeRatio"));
     if (!isNaN(savedDuckRatio) && savedDuckRatio > 0) {
       this.duckSizeRatio = savedDuckRatio;
-      const trackElement = document.getElementById("raceTrack");
-      if (trackElement) {
-        const sizePx = this.trackHeight * this.duckSizeRatio;
-        trackElement.style.setProperty("--duck-size", `${sizePx}px`);
+    }
+
+    // Load saved duckScale (if any)
+    const savedDuckScale = parseFloat(localStorage.getItem("duckScale"));
+    if (!isNaN(savedDuckScale) && savedDuckScale > 0) {
+      this.duckScale = savedDuckScale;
+    }
+
+    // Apply to CSS variable
+    const trackElement = document.getElementById("raceTrack");
+    if (trackElement) {
+      const sizePx = Math.round(
+        this.trackHeight * this.duckSizeRatio * (this.duckScale || 1),
+      );
+      trackElement.style.setProperty("--duck-size", `${sizePx}px`);
+    }
+
+    const duckSizeEl = document.getElementById("duckSizeRatio");
+    if (duckSizeEl) {
+      // Slider expects 10-100 (percent). Convert internal 0.1-1.0 -> 10-100
+      duckSizeEl.value = Math.round(this.duckSizeRatio * 100);
+    }
+    const duckSizeValue = document.getElementById("duckSizeValue");
+    if (duckSizeValue)
+      duckSizeValue.textContent = Math.round(this.duckSizeRatio * 100) + "%";
+
+    // Initialize duckScale slider UI if present
+    const duckScaleEl = document.getElementById("duckScale");
+    const duckScaleValue = document.getElementById("duckScaleValue");
+    if (duckScaleEl) {
+      duckScaleEl.value = Math.round((this.duckScale || 1) * 100);
+      if (duckScaleValue)
+        duckScaleValue.textContent =
+          Math.round((this.duckScale || 1) * 100) + "%";
+    }
+
+    // Load persisted minDisplayLanes setting (control panel)
+    try {
+      const savedMin = parseInt(localStorage.getItem("minDisplayLanes"), 10);
+      if (!isNaN(savedMin) && savedMin > 0) {
+        // Use setter so redistribution/broadcast is executed
+        this.setMinDisplayLanes(savedMin);
       }
-      const duckSizeEl = document.getElementById("duckSizeRatio");
-      if (duckSizeEl) {
-        // Slider expects 10-100 (percent). Convert internal 0.1-1.0 -> 10-100
-        duckSizeEl.value = Math.round(this.duckSizeRatio * 100);
-      }
-      const duckSizeValue = document.getElementById("duckSizeValue");
-      if (duckSizeValue)
-        duckSizeValue.textContent = Math.round(this.duckSizeRatio * 100) + "%";
+      const minEl = document.getElementById("minDisplayLanes");
+      if (minEl) minEl.value = this.minDisplayLanes;
+    } catch (e) {
+      console.warn("Failed to load minDisplayLanes:", e);
     }
 
     // Load persisted force cluster camera preference
@@ -4040,6 +4186,11 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         usedPrizesCount: this.usedPrizesCount, // Send prize counter
         prizeRaceList: [...this.prizeRaceList], // Send prize list
         currentScriptPrizeName: this.currentScriptPrizeName, // Send prize name from script
+        // Send duck sizing info so display can apply same scale
+        duckSizeRatio: this.duckSizeRatio,
+        duckScale: this.duckScale,
+        // Send minimum lanes setting so display can match control
+        minDisplayLanes: this.minDisplayLanes,
       };
 
       console.log("Race data to send:", raceData);
@@ -4181,10 +4332,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     // Calculate viewport width dynamically based on track container
     const trackElement = document.getElementById("raceTrack");
     this.viewportWidth = trackElement.clientWidth || 1200;
-    // Calculate trackHeight from race-river which is 60% of race-track
-    // Use race-track height and calculate race-river portion
+    // Calculate trackHeight to match CSS: race-river = 70% of race-track
     const raceTrackHeight = trackElement.clientHeight || 250;
-    this.trackHeight = raceTrackHeight * 0.6; // race-river is 60% of race-track
+    this.trackHeight = raceTrackHeight * 0.7; // set race-river height to 70% to match CSS
 
     console.log(
       `[Track Debug] raceTrack clientHeight: ${raceTrackHeight}, calculated raceRiver height: ${this.trackHeight}`,
@@ -4233,18 +4383,23 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     this.finishLinePreviewShown = false; // Reset preview state
     this.finishLinePreviewStartTime = 0; // Reset preview timer
 
-    // Set initial CSS variable for duck size
-    const initialDuckHeight = this.trackHeight * this.duckSizeRatio;
+    // Set initial CSS variable for duck size (scaled)
+    const initialBaseDuckHeight = this.trackHeight * this.duckSizeRatio;
+    const initialDuckHeight = Math.round(
+      initialBaseDuckHeight * (this.duckScale || 1),
+    );
     trackElement.style.setProperty("--duck-size", `${initialDuckHeight}px`);
 
     // Add resize handler for responsive scaling
     this.resizeHandler = () => {
       this.viewportWidth = trackElement.clientWidth || 1200;
       const raceTrackHeight = trackElement.clientHeight || 250;
-      this.trackHeight = raceTrackHeight * 0.6; // race-river is 60% of race-track
+      // Use CSS ratio: race-river = 70% of raceTrack
+      this.trackHeight = raceTrackHeight * 0.7;
 
       // Update CSS variable for duck size
-      const duckHeight = this.trackHeight * this.duckSizeRatio;
+      const baseDuckHeight = this.trackHeight * this.duckSizeRatio;
+      const duckHeight = Math.round(baseDuckHeight * (this.duckScale || 1));
       trackElement.style.setProperty("--duck-size", `${duckHeight}px`);
 
       if (this.raceStarted && !this.raceFinished) {
@@ -4372,7 +4527,10 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     }
 
     // Distribute initial lanes evenly to avoid stacked clusters at start
-    const NUM_DISPLAY_LANES = 5;
+    const NUM_DISPLAY_LANES = Math.max(
+      this.minDisplayLanes,
+      Math.min(30, this.duckCount),
+    );
     for (let idx = 0; idx < this.ducks.length; idx++) {
       const d = this.ducks[idx];
       d.lane = idx % NUM_DISPLAY_LANES; // Evenly spread across lanes
@@ -4380,6 +4538,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       d.laneOffset = (Math.random() - 0.5) * 12; // slight vertical jitter
       d.targetLaneOffset = d.laneOffset;
       d.lastLaneChangeTime = Date.now();
+      // Note: NUM_DISPLAY_LANES is at least this.minDisplayLanes (10) by design
 
       // Spread initial horizontal positions slightly so ducks are not stacked at x=0
       // Use up to ~6% of viewport width to scatter starters
@@ -4462,10 +4621,18 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   }
 
   beginRace() {
-    if (this.raceStarted) return;
+    if (this.raceStarted) {
+      console.warn(
+        `beginRace called but raceStarted already true (instance=${this._instanceId})`,
+      );
+      return;
+    }
 
     // Set race started flag BEFORE calling animate()
     this.raceStarted = true;
+    console.log(
+      `beginRace invoked (instance=${this._instanceId}, isDisplayMode=${this.isDisplayMode})`,
+    );
 
     console.log("=== RACE SETUP ===");
     console.log("Preparing race with", this.ducks.length, "ducks");
@@ -4503,6 +4670,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         this.lastUIUpdate = 0;
         this.rankingUpdateCounter = 0;
         this.animationId = requestAnimationFrame((ts) => this.animate(ts));
+        console.log(
+          `beginRace: animation scheduled id=${this.animationId}, instance=${this._instanceId}, display=${this.isDisplayMode}`,
+        );
       });
     } else {
       // Control mode - NO countdown, NO animation, just track timing
@@ -4548,7 +4718,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       canvas.style.width = "100%";
       canvas.style.height = "100%";
       canvas.style.pointerEvents = "none";
-      canvas.style.zIndex = "10";
+      canvas.style.zIndex = "1000"; // ensure canvas ducks sit above bank-top
       this.trackContainer.appendChild(canvas);
     }
 
@@ -4637,24 +4807,40 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     }
 
     // Duck size scales with track height (controlled by duckSizeRatio)
-    const duckHeight = this.trackHeight * this.duckSizeRatio;
-    const topPadding = this.trackHeight * 0.02; // 2% padding
-    const bottomPadding = this.trackHeight * 0.02; // 2% padding
-    // Sửa: không trừ duckHeight để lane đầu/cuối sát mép trên/dưới
+    const baseDuckHeight = this.trackHeight * this.duckSizeRatio;
+    const duckHeight = Math.round(baseDuckHeight * (this.duckScale || 1));
+    const topPadding = this.trackHeight * 0.02; // 2% top padding
+    const bottomPadding = 0; // Make bottom lane flush to track bottom
+
+    // Use a dynamic number of display lanes, minimum enforced
+    const NUM_DISPLAY_LANES = Math.max(
+      this.minDisplayLanes,
+      Math.min(30, this.duckCount),
+    );
     const availableHeight = this.trackHeight - topPadding - bottomPadding;
-    // Nếu chỉ có 1 vịt thì đặt laneHeight = 0 để không chia
     const laneHeight =
-      this.duckCount > 1 ? availableHeight / (this.duckCount - 1) : 0;
+      NUM_DISPLAY_LANES > 1 ? availableHeight / (NUM_DISPLAY_LANES - 1) : 0;
 
     const duckEl = document.createElement("div");
     duckEl.className = "duck-element";
     duckEl.style.width = `${duckHeight}px`;
     duckEl.style.height = `${duckHeight}px`;
     // Lane 0 sát đáy river-race, lane N-1 sát đỉnh, chia đều từ dưới lên
-    const laneIdx = index - 1;
-    const laneCount = this.duckCount;
-    const y = (this.trackHeight - duckHeight) * (1 - laneIdx / (laneCount - 1));
-    duckEl.style.top = `${y}px`;
+    // Prefer explicit duck.lane if available, else assign by index
+    const laneIndex = Math.max(
+      0,
+      Math.min(
+        NUM_DISPLAY_LANES - 1,
+        typeof duck.lane !== "undefined"
+          ? duck.lane
+          : (index - 1) % NUM_DISPLAY_LANES,
+      ),
+    );
+    const y = topPadding + (NUM_DISPLAY_LANES - 1 - laneIndex) * laneHeight;
+    // Clamp top so duck visuals can't escape track area (keep logical lane inside track)
+    const maxTop = Math.max(0, this.trackHeight - duckHeight);
+    const clampedTop = Math.max(0, Math.min(y, maxTop));
+    duckEl.style.top = `${clampedTop}px`;
     duckEl.style.left = "0px";
 
     if (this.imagesLoaded && this.duckImages.length > 0) {
@@ -4664,8 +4850,8 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       img.src = this.duckImages[iconIndex][0].src;
       img.className = "duck-icon";
       img.alt = duck.name;
-      img.style.width = `${duckHeight}px`;
-      img.style.height = `${duckHeight}px`;
+      img.style.width = "auto";
+      img.style.height = "100%";
       duckEl.appendChild(img);
     } else {
       const circle = document.createElement("div");
@@ -4698,19 +4884,23 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
   }
 
   redistributeDucks() {
-    const duckHeight = this.trackHeight * this.duckSizeRatio;
+    const baseDuckHeight = this.trackHeight * this.duckSizeRatio;
+    const duckHeight = Math.round(baseDuckHeight * (this.duckScale || 1));
     const topPadding = this.trackHeight * 0.02;
-    const bottomPadding = this.trackHeight * 0.02;
-    // Sửa: không trừ duckHeight để lane đầu/cuối sát mép trên/dưới
+    const bottomPadding = 0; // Make bottom lane flush
+    const NUM_DISPLAY_LANES = Math.max(
+      this.minDisplayLanes,
+      Math.min(30, this.duckCount),
+    );
     const availableHeight = this.trackHeight - topPadding - bottomPadding;
     const laneHeight =
-      this.duckCount > 1 ? availableHeight / (this.duckCount - 1) : 0;
+      NUM_DISPLAY_LANES > 1 ? availableHeight / (NUM_DISPLAY_LANES - 1) : 0;
 
     this.ducks.forEach((duck, index) => {
       const duckEl = this.duckElements.get(duck.id);
       if (duckEl) {
         // Lane 0 sát đáy river-race, lane N-1 sát đỉnh, chia đều từ dưới lên
-        const laneCount = this.duckCount;
+        const laneCount = NUM_DISPLAY_LANES;
         const y =
           (this.trackHeight - duckHeight) * (1 - index / (laneCount - 1));
         duckEl.style.top = `${y}px`;
@@ -4732,8 +4922,8 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         // Update icon/circle size if already created
         const duckImg2 = duckEl.querySelector(".duck-icon");
         if (duckImg2) {
-          duckImg2.style.width = `${duckHeight}px`;
-          duckImg2.style.height = `${duckHeight}px`;
+          duckImg2.style.width = "auto";
+          duckImg2.style.height = "100%";
         } else {
           const circle = duckEl.querySelector("div");
           if (circle) {
@@ -4767,13 +4957,16 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       this.trackHeight && this.trackHeight > 0 ? this.trackHeight : 0;
     if (!effectiveTrackHeight && trackElement) {
       const raceTrackHeight = trackElement.clientHeight || 250;
-      effectiveTrackHeight = raceTrackHeight * 0.6; // race-river is 60% of race-track
+      // Use CSS ratio: race-river = 70% of raceTrack
+      effectiveTrackHeight = raceTrackHeight * 0.7;
       this.trackHeight = effectiveTrackHeight; // store for subsequent calls
     }
 
     const sizePx = Math.max(
       1,
-      Math.round(effectiveTrackHeight * this.duckSizeRatio),
+      Math.round(
+        effectiveTrackHeight * this.duckSizeRatio * (this.duckScale || 1),
+      ),
     );
 
     // Update CSS variable so .duck-element picks it up
@@ -4784,6 +4977,41 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     // Recompute lanes and spacing so layout matches new size
     this.redistributeDucks();
+  }
+
+  // Set minimum number of display lanes (persisted)
+  setMinDisplayLanes(val) {
+    let v = parseInt(val, 10);
+    if (isNaN(v)) return;
+    // Clamp to reasonable range
+    v = Math.max(2, Math.min(30, v));
+    this.minDisplayLanes = v;
+    try {
+      localStorage.setItem("minDisplayLanes", String(v));
+      console.log("✓ minDisplayLanes set to:", v);
+    } catch (e) {
+      console.warn("Could not persist minDisplayLanes:", e);
+    }
+
+    // Update UI control if present
+    const el = document.getElementById("minDisplayLanes");
+    if (el) el.value = v;
+
+    // Recompute lanes immediately
+    try {
+      this.redistributeDucks();
+    } catch (e) {
+      console.warn("redistributeDucks failed after minDisplayLanes change:", e);
+    }
+
+    // Notify display tab if connected
+    if (this.displayChannel) {
+      this.displayChannel.postMessage({
+        type: "MIN_DISPLAY_LANES_UPDATED",
+        data: { minDisplayLanes: v },
+      });
+      console.log("📢 Sent MIN_DISPLAY_LANES_UPDATED to display:", v);
+    }
   }
 
   // Force cluster camera mode - can be toggled from control panel
@@ -5197,6 +5425,9 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
       // Reset frame time tracking
       this.lastFrameTime = Date.now();
       this.animationId = requestAnimationFrame((ts) => this.animate(ts));
+      console.log(
+        `resumeRace: animation scheduled id=${this.animationId}, instance=${this._instanceId}, display=${this.isDisplayMode}`,
+      );
 
       // Send resume command to display window
       if (this.displayChannel && !this.isDisplayMode) {
@@ -5317,7 +5548,10 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
             const idx = duck.finishOrder - 1; // 0-based
             const k = Math.ceil(idx / 2);
             const sign = idx % 2 === 1 ? 1 : -1; // pattern: 0, +1, -1, +2, -2...
-            const duckHeight = this.trackHeight * this.duckSizeRatio;
+            const baseDuckHeight = this.trackHeight * this.duckSizeRatio;
+            const duckHeight = Math.round(
+              baseDuckHeight * (this.duckScale || 1),
+            );
             const spacing = Math.round(duckHeight * this.finishSpacingRatio);
             const offset = k * sign * spacing;
             duck.finishOffset = offset;
@@ -5926,7 +6160,10 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     const topDucks = this.rankings.slice(0, topDuckCount);
 
     // Group ducks by their current lane
-    const NUM_LANES = 5; // Use 5 lanes for smoother transitions
+    const NUM_LANES = Math.max(
+      this.minDisplayLanes,
+      Math.min(30, this.duckCount),
+    ); // Dynamic number of lanes (min enforced)
     const lanes = Array.from({ length: NUM_LANES }, () => []);
 
     topDucks.forEach((duck) => {
@@ -6024,11 +6261,15 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
         // Lazy creation - only create element when duck enters viewport
         if (!duckEl) {
-          const duckHeight = this.trackHeight * this.duckSizeRatio;
+          const baseDuckHeight = this.trackHeight * this.duckSizeRatio;
+          const duckHeight = Math.round(baseDuckHeight * (this.duckScale || 1));
           const topPadding = this.trackHeight * 0.02;
-          const bottomPadding = this.trackHeight * 0.02;
+          const bottomPadding = 0; // Make bottom lane flush to track bottom
           const availableHeight = this.trackHeight - topPadding - bottomPadding;
-          const NUM_DISPLAY_LANES = 5;
+          const NUM_DISPLAY_LANES = Math.max(
+            this.minDisplayLanes,
+            Math.min(30, this.duckCount),
+          );
           const laneHeight =
             NUM_DISPLAY_LANES > 1
               ? availableHeight / (NUM_DISPLAY_LANES - 1)
@@ -6041,7 +6282,11 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           duckEl = document.createElement("div");
           duckEl.className = "duck-element";
           // Đảo ngược: lane 0 ở dưới, lane N-1 ở trên
-          duckEl.style.top = `${topPadding + (NUM_DISPLAY_LANES - 1 - targetLane) * laneHeight}px`;
+          const y =
+            topPadding + (NUM_DISPLAY_LANES - 1 - targetLane) * laneHeight;
+          const maxTop = Math.max(0, this.trackHeight - duckHeight);
+          const clampedY = Math.max(0, Math.min(y, maxTop));
+          duckEl.style.top = `${clampedY}px`;
           duckEl.style.left = "0px";
           duckEl.style.transition = "top 0.5s ease-out"; // Smooth lane transitions
 
@@ -6051,8 +6296,8 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
             img.src = this.duckImages[iconIndex][0].src;
             img.className = "duck-icon";
             img.alt = duck.name;
-            img.style.width = `${duckHeight}px`;
-            img.style.height = `${duckHeight}px`;
+            img.style.width = "auto";
+            img.style.height = "100%";
             duckEl.appendChild(img);
           } else {
             const circle = document.createElement("div");
@@ -6089,11 +6334,15 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         }
 
         // Update lane position dynamically
-        const duckHeight = this.trackHeight * this.duckSizeRatio;
+        const baseDuckHeight = this.trackHeight * this.duckSizeRatio;
+        const duckHeight = Math.round(baseDuckHeight * (this.duckScale || 1));
         const topPadding = this.trackHeight * 0.02;
-        const bottomPadding = this.trackHeight * 0.02;
+        const bottomPadding = 0; // Make bottom lane flush
         const availableHeight = this.trackHeight - topPadding - bottomPadding;
-        const NUM_DISPLAY_LANES = 5;
+        const NUM_DISPLAY_LANES = Math.max(
+          this.minDisplayLanes,
+          Math.min(30, this.duckCount),
+        );
         const laneHeight =
           NUM_DISPLAY_LANES > 1 ? availableHeight / (NUM_DISPLAY_LANES - 1) : 0;
         const targetLane = Math.max(
@@ -6220,20 +6469,36 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     // Calculate duck metrics
     // Luôn lấy duckHeight từ this.duckSizeRatio hiện tại
-    const duckHeight = this.trackHeight * this.duckSizeRatio;
+    const baseDuckHeight = this.trackHeight * this.duckSizeRatio;
+    const duckHeight = Math.round(baseDuckHeight * (this.duckScale || 1));
+    // Tính duckWidth dựa trên aspect ratio của ảnh đầu tiên
+    const aspectRatio =
+      this.iconImages && this.iconImages[0]
+        ? this.iconImages[0].naturalWidth / this.iconImages[0].naturalHeight
+        : 1;
+    const duckWidth = duckHeight * aspectRatio;
     // Log để debug live update
     console.log(
       "[DuckSize][Canvas] duckHeight:",
       duckHeight,
+      "duckWidth:",
+      duckWidth,
       "trackHeight:",
       this.trackHeight,
       "duckSizeRatio:",
       this.duckSizeRatio,
+      "aspectRatio:",
+      aspectRatio,
+      "duckScale:",
+      this.duckScale,
     );
     const topPadding = this.trackHeight * 0.02;
-    const bottomPadding = this.trackHeight * 0.02;
+    const bottomPadding = 0; // Make bottom lane flush to track bottom
     const availableHeight = this.trackHeight - topPadding - bottomPadding;
-    const NUM_DISPLAY_LANES = 5;
+    const NUM_DISPLAY_LANES = Math.max(
+      this.minDisplayLanes,
+      Math.min(30, this.duckCount),
+    );
     const laneHeight =
       NUM_DISPLAY_LANES > 1 ? availableHeight / (NUM_DISPLAY_LANES - 1) : 0;
 
@@ -6277,22 +6542,54 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     const drawList = [...notFinished, ...finishedArr];
 
     // Draw from drawList so finished ducks are drawn last (on top)
+    // Compute riverTopOffset dynamically from DOM if possible so ducks are drawn inside the river area
+    let riverTopOffset = 0;
+    try {
+      const riverEl = document.getElementById("raceRiver");
+      if (riverEl && this.trackContainer) {
+        const riverRect = riverEl.getBoundingClientRect();
+        const trackRect = this.trackContainer.getBoundingClientRect();
+        riverTopOffset = Math.round(riverRect.top - trackRect.top);
+      } else if (this.canvas) {
+        riverTopOffset = Math.round(this.canvas.height * 0.15);
+      }
+    } catch (e) {
+      riverTopOffset = this.canvas ? Math.round(this.canvas.height * 0.15) : 0;
+    }
     drawList.forEach(({ duck, index, finalX, finalY }, drawIdx) => {
+      // Apply river offset so ducks render inside the river area (not under bank-top)
+      const drawY = finalY + riverTopOffset;
+
       // Draw icon
       if (this.imagesLoaded && this.duckImages.length > 0) {
         const iconIndex = (duck.id - 1) % this.duckImages.length;
         const frameImages = this.duckImages[iconIndex];
         if (frameImages && frameImages[duck.currentFrame]) {
           const img = frameImages[duck.currentFrame];
-          if (img.complete)
-            this.ctx.drawImage(img, finalX, finalY, duckHeight, duckHeight);
+          if (img.complete) {
+            // Compute aspect from the actual frame image to preserve original ratio
+            const aspect =
+              img.naturalWidth && img.naturalHeight
+                ? img.naturalWidth / img.naturalHeight
+                : 1;
+            const drawWidth = Math.round(duckHeight * aspect);
+            // Center horizontally so different widths don't shift the duck anchor
+            const drawX = finalX - Math.round((drawWidth - duckHeight) / 2);
+            // Clamp vertically so visuals remain inside the track bounds, add small safety padding
+            const safety = 4; // px
+            const maxY = this.canvas
+              ? Math.max(0, this.canvas.height - duckHeight - safety)
+              : drawY;
+            const clampedDrawY = Math.max(safety, Math.min(drawY, maxY));
+            this.ctx.drawImage(img, drawX, clampedDrawY, drawWidth, duckHeight);
+          }
         }
       } else {
         this.ctx.fillStyle = duck.color;
         this.ctx.beginPath();
         this.ctx.arc(
           finalX + duckHeight / 2,
-          finalY + duckHeight / 2,
+          drawY + duckHeight / 2,
           duckHeight / 2,
           0,
           Math.PI * 2,
@@ -6313,7 +6610,7 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
           : duck.name;
       const textMetrics = this.ctx.measureText(name);
       const textWidth = textMetrics.width;
-      const textY = Math.round(finalY + duckHeight / 2);
+      const textY = Math.round(drawY + duckHeight / 2);
 
       if (duck.finished) {
         // Draw semi-transparent bg rect and gold text to the right
@@ -6912,6 +7209,99 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
 
     topNWinnersGridEl.innerHTML = winnersHTML;
 
+    // Equalize Top-N card widths so columns look consistent
+    // Helper: measure widest card and apply that width to all cards
+    const equalizeTopnWidths = () => {
+      try {
+        const grid = topNWinnersGridEl;
+        if (!grid) return;
+        const cards = Array.from(grid.querySelectorAll(".topn-winner-card"));
+        if (!cards.length) return;
+        // reset inline sizing so measurement uses natural sizes
+        cards.forEach((c) => {
+          c.style.removeProperty("width");
+          c.style.removeProperty("flex");
+          c.style.removeProperty("min-width");
+          c.style.removeProperty("max-width");
+        });
+        // measure
+        let maxW = 0;
+        cards.forEach((c) => {
+          const w = Math.ceil(c.getBoundingClientRect().width);
+          if (w > maxW) maxW = w;
+        });
+        if (maxW > 0) {
+          const px = maxW + "px";
+          cards.forEach((c) => {
+            // Apply inline properties with !important to override stylesheet rules
+            c.style.setProperty("width", px, "important");
+            c.style.setProperty("flex", `0 0 ${px}`, "important");
+            c.style.setProperty("min-width", px, "important");
+            c.style.setProperty("max-width", px, "important");
+          });
+        }
+      } catch (err) {
+        console.error("Error equalizing TopN card widths:", err);
+      }
+    };
+
+    // Call once after DOM insertion (small delay to allow layout)
+    setTimeout(equalizeTopnWidths, 40);
+
+    // Re-run after images load (if any) to capture final sizes
+    const imgs = topNWinnersGridEl.querySelectorAll("img");
+    if (imgs && imgs.length) {
+      let remaining = imgs.length;
+      const onImg = () => {
+        remaining--;
+        if (remaining <= 0) equalizeTopnWidths();
+      };
+      imgs.forEach((img) => {
+        if (img.complete) {
+          onImg();
+        } else {
+          img.addEventListener("load", onImg);
+          img.addEventListener("error", onImg);
+        }
+      });
+    }
+
+    // Handle window resize (debounced)
+    if (this._topnResizeListener) {
+      window.removeEventListener("resize", this._topnResizeListener);
+      this._topnResizeListener = null;
+    }
+    this._topnResizeListener = () => {
+      clearTimeout(this._topnResizeTimer);
+      this._topnResizeTimer = setTimeout(equalizeTopnWidths, 80);
+    };
+    window.addEventListener("resize", this._topnResizeListener);
+
+    // Create ResizeObserver (if supported) to watch cards for content/size changes
+    if (this._topnResizeObserver) {
+      try {
+        this._topnResizeObserver.disconnect();
+      } catch (e) {}
+      this._topnResizeObserver = null;
+    }
+    try {
+      const debounce = (fn, wait) => {
+        let t;
+        return (...a) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...a), wait);
+        };
+      };
+      this._topnResizeObserver = new ResizeObserver(
+        debounce(equalizeTopnWidths, 60),
+      );
+      Array.from(
+        topNWinnersGridEl.querySelectorAll(".topn-winner-card"),
+      ).forEach((c) => this._topnResizeObserver.observe(c));
+    } catch (e) {
+      /* ResizeObserver not available - rely on window resize and image load fallback */
+    }
+
     // Show popup with animation
     popup.style.display = "flex";
     popup.classList.remove("hidden");
@@ -6971,10 +7361,45 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
     const popup = document.getElementById("topNVictoryPopup");
     if (!popup) return;
     popup.classList.remove("show");
+
+    // Clean up equalized widths, observer and resize listener
+    if (this._topnResizeListener) {
+      window.removeEventListener("resize", this._topnResizeListener);
+      this._topnResizeListener = null;
+      clearTimeout(this._topnResizeTimer);
+      this._topnResizeTimer = null;
+    }
+    if (this._topnResizeObserver) {
+      try {
+        this._topnResizeObserver.disconnect();
+      } catch (e) {
+        /* ignore */
+      }
+      this._topnResizeObserver = null;
+    }
+    // Reset card widths to allow natural layout when popup is hidden
+    const resetTopnWidths = () => {
+      try {
+        const grid = document.getElementById("topNWinnersGrid");
+        if (!grid) return;
+        const cards = Array.from(grid.querySelectorAll(".topn-winner-card"));
+        cards.forEach((c) => {
+          c.style.removeProperty("width");
+          c.style.removeProperty("flex");
+          c.style.removeProperty("min-width");
+          c.style.removeProperty("max-width");
+        });
+      } catch (err) {
+        console.error("Error resetting TopN widths:", err);
+      }
+    };
+    // Hide popup after animation, then reset widths
     setTimeout(() => {
       popup.classList.add("hidden");
       popup.style.display = "none";
+      resetTopnWidths();
     }, 300);
+
     // Gửi tín hiệu cho display để tắt popup Top N nếu đang ở chế độ điều khiển
     if (this.displayChannel && !this.isDisplayMode) {
       this.displayChannel.postMessage({
@@ -7216,7 +7641,8 @@ ${this.prizeRaceList.length > 0 ? this.prizeRaceList.map((p, i) => `   ${i + 1}.
         if (this.imagesLoaded && this.duckImages.length > 0) {
           const iconIndex = (winner.id - 1) % this.duckImages.length;
           if (this.duckImages[iconIndex] && this.duckImages[iconIndex][0]) {
-            iconHTML = `<img src="${this.duckImages[iconIndex][0].src}" alt="${winner.name}" style="width: 60px; height: 60px; object-fit: contain;">`;
+            // Remove inline width/height so CSS can control cropping and sizing
+            iconHTML = `<img src="${this.duckImages[iconIndex][0].src}" alt="${winner.name}">`;
           }
         }
 

@@ -121,6 +121,93 @@ export class HistoryManager {
 
     topNWinnersGridEl.innerHTML = winnersHTML;
 
+    // Equalize Top-N card widths so columns look consistent
+    const equalizeTopnWidths = () => {
+      try {
+        const grid = topNWinnersGridEl;
+        if (!grid) return;
+        const cards = Array.from(grid.querySelectorAll(".topn-winner-card"));
+        if (!cards.length) return;
+        // reset inline sizing so measurement uses natural sizes
+        cards.forEach((c) => {
+          c.style.removeProperty("width");
+          c.style.removeProperty("flex");
+          c.style.removeProperty("min-width");
+          c.style.removeProperty("max-width");
+        });
+        let maxW = 0;
+        cards.forEach((c) => {
+          const w = Math.ceil(c.getBoundingClientRect().width);
+          if (w > maxW) maxW = w;
+        });
+        if (maxW > 0) {
+          const px = maxW + "px";
+          cards.forEach((c) => {
+            c.style.setProperty("width", px, "important");
+            c.style.setProperty("flex", `0 0 ${px}`, "important");
+            c.style.setProperty("min-width", px, "important");
+            c.style.setProperty("max-width", px, "important");
+          });
+        }
+      } catch (err) {
+        console.error("Error equalizing TopN card widths:", err);
+      }
+    };
+
+    setTimeout(equalizeTopnWidths, 40);
+
+    const imgs = topNWinnersGridEl.querySelectorAll("img");
+    if (imgs && imgs.length) {
+      let remaining = imgs.length;
+      const onImg = () => {
+        remaining--;
+        if (remaining <= 0) equalizeTopnWidths();
+      };
+      imgs.forEach((img) => {
+        if (img.complete) {
+          onImg();
+        } else {
+          img.addEventListener("load", onImg);
+          img.addEventListener("error", onImg);
+        }
+      });
+    }
+
+    if (this._topnResizeListener) {
+      window.removeEventListener("resize", this._topnResizeListener);
+      this._topnResizeListener = null;
+    }
+    this._topnResizeListener = () => {
+      clearTimeout(this._topnResizeTimer);
+      this._topnResizeTimer = setTimeout(equalizeTopnWidths, 80);
+    };
+    window.addEventListener("resize", this._topnResizeListener);
+
+    // Setup ResizeObserver to watch each card and re-equalize when something inside changes
+    if (this._topnResizeObserver) {
+      try {
+        this._topnResizeObserver.disconnect();
+      } catch (e) {}
+      this._topnResizeObserver = null;
+    }
+    try {
+      const debounce = (fn, wait) => {
+        let t;
+        return (...a) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...a), wait);
+        };
+      };
+      this._topnResizeObserver = new ResizeObserver(
+        debounce(equalizeTopnWidths, 60),
+      );
+      Array.from(
+        topNWinnersGridEl.querySelectorAll(".topn-winner-card"),
+      ).forEach((c) => this._topnResizeObserver.observe(c));
+    } catch (e) {
+      /* ResizeObserver not available */
+    }
+
     // Show popup with animation
     popup.style.display = "flex";
     popup.classList.remove("hidden");
@@ -183,10 +270,44 @@ export class HistoryManager {
     const popup = document.getElementById("topNVictoryPopup");
     if (!popup) return;
     popup.classList.remove("show");
+
+    // Clean up equalized widths, observer and resize listener
+    if (this._topnResizeListener) {
+      window.removeEventListener("resize", this._topnResizeListener);
+      this._topnResizeListener = null;
+      clearTimeout(this._topnResizeTimer);
+      this._topnResizeTimer = null;
+    }
+    if (this._topnResizeObserver) {
+      try {
+        this._topnResizeObserver.disconnect();
+      } catch (e) {
+        /* ignore */
+      }
+      this._topnResizeObserver = null;
+    }
+    const resetTopnWidths = () => {
+      try {
+        const grid = document.getElementById("topNWinnersGrid");
+        if (!grid) return;
+        const cards = Array.from(grid.querySelectorAll(".topn-winner-card"));
+        cards.forEach((c) => {
+          c.style.removeProperty("width");
+          c.style.removeProperty("flex");
+          c.style.removeProperty("min-width");
+          c.style.removeProperty("max-width");
+        });
+      } catch (err) {
+        console.error("Error resetting TopN widths:", err);
+      }
+    };
+
     setTimeout(() => {
       popup.classList.add("hidden");
       popup.style.display = "none";
+      resetTopnWidths();
     }, 300);
+
     // Gửi tín hiệu cho display để tắt popup Top N nếu đang ở chế độ điều khiển
     if (this.game.displayChannel && !this.game.isDisplayMode) {
       this.game.displayChannel.postMessage({
