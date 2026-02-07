@@ -838,11 +838,23 @@
         outline: none !important;
       }
 
+      /* Force Top N cards to have white background on display and ensure legible text */
+      #topNVictoryPopup .topn-winner-card {
+        background: #ffffff !important;
+        color: #222222 !important;
+      }
+
+      /* Remove any pseudo-element background so the card remains clean white */
+      #topNVictoryPopup .topn-winner-card::before,
+      #topNVictoryPopup .topn-winner-card::after {
+        background: transparent !important;
+      }
+
       /* Re-enable specific visuals we still want: keep name and medal text color and positioning */
       #victoryPopup .winner-name,
       #topNVictoryPopup .topn-winner-name {
         font-size: clamp(3em) !important;
-        color: #ffffff !important;
+        color: #000000 !important;
         text-shadow: none !important;
         background: transparent !important;
         padding: 0 !important;
@@ -887,13 +899,13 @@
       .topn-winner-code {
         font-size: clamp(1em, 1vw, 1.5em) !important;
         font-weight: 700 !important;
-        color: #ffd700 !important;
+        color: #012400 !important;
         margin: 0 !important; /* tighten spacing */
         padding: 0 !important;
         text-align: center !important;
         white-space: nowrap !important;
         overflow: visible !important;
-        text-overflow: clip !important;
+        /* text-overflow: clip !important; */
         line-height: 1.1 !important;
         text-shadow: 0 3px 6px rgba(0, 0, 0, 0.3) !important;
       }
